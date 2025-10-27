@@ -1,0 +1,409 @@
+version: '3.9'
+
+services:
+  # API Gateway
+  kong:
+    image: kong:3.4
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    ports:
+      - "8000:8000"  # Proxy
+      - "8001:8001"  # Admin API
+      - "8443:8443"  # Proxy SSL
+      - "8444:8444"  # Admin API SSL
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # PostgreSQL - Main Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: platform123
+      POSTGRES_DB: marketplace
+      POSTGRES_MULTIPLE_DATABASES: platform,marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./Backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql
+      - ./Backend/scripts/site-builder-schema.sql:/docker-entrypoint-initdb.d/02-site-builder.sql
+      - ./Backend/scripts/support-tickets-schema.sql:/docker-entrypoint-initdb.d/03-support-tickets.sql
+    networks:
+      - platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d marketplace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+
+  # Redis - Cache & Session Store
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - platform-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Elasticsearch - Search Engine
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Kafka - Message Queue
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Prometheus - Metrics
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./Infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Grafana - Metrics Visualization
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3010:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: redis-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./Infrastructure/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./Infrastructure/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # MinIO - S3-compatible Object Storage
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Auth Service (Go)
+  # Auth API (Node.js) - Real authentication
+  auth-api:
+    build:
+      context: ./Backend/auth-api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://platform:platform123@postgres:5432/marketplace
+      - JWT_SECRET=your-jwt-secret-change-in-production-please-use-strong-secret
+      - PORT=8080
+    depends_on:
+      - postgres
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Catalog Service (Node.js)
+  catalog-service:
+    build:
+      context: ./Backend/catalog-service
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://platform:platform123@postgres:5432/platform
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - KAFKA_BROKERS=kafka:9092
+      - PORT=3000
+    depends_on:
+      - postgres
+      - redis
+      - elasticsearch
+      - kafka
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Order Service (Java/Spring Boot)
+  order-service:
+    build:
+      context: ./Backend/order-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/marketplace
+      - SPRING_DATASOURCE_USERNAME=platform
+      - SPRING_DATASOURCE_PASSWORD=platform123
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP-SERVERS=kafka:9092
+      - SERVER_PORT=8083
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Payment Service (Node.js)
+  payment-service:
+    build:
+      context: ./Backend/payment-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - DATABASE_URL=postgresql://platform:platform123@postgres:5432/platform
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID}
+      - YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY}
+      - PORT=3002
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Logistics/PVZ Service (Go)
+  logistics-service:
+    build:
+      context: ./Backend/logistics-service
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DATABASE_URL=postgresql://platform:platform123@postgres:5432/platform?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - CDEK_CLIENT_ID=${CDEK_CLIENT_ID}
+      - CDEK_CLIENT_SECRET=${CDEK_CLIENT_SECRET}
+      - PORT=8082
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Config Service (Node.js + GraphQL) - Server-Driven UI
+  config-service:
+    build:
+      context: ./Backend/config-service
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=marketplace
+      - DB_USER=platform
+      - DB_PASSWORD=platform123
+      - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=4000
+      - CORS_ORIGIN=http://localhost:3001,http://localhost:3002,http://localhost:3003
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - platform-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Notification Service (Python)
+  notification-service:
+    build:
+      context: ./Backend/notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://platform:platform123@postgres:5432/platform
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - PORT=5000
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Web App (Next.js PWA) - Customer-facing marketplace
+  web-app:
+    build:
+      context: ./Frontend/web-app
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_GRAPHQL_URL=http://localhost:4000/graphql
+      - NEXT_PUBLIC_CATALOG_API=http://localhost:3000
+      - NEXT_PUBLIC_CONFIG_SERVICE_URL=http://localhost:4000
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3003
+      - NEXT_PUBLIC_USE_SUBDOMAIN=false
+      - NEXT_PUBLIC_DEFAULT_TENANT=default
+      - NODE_ENV=production
+    depends_on:
+      - config-service
+      - catalog-service
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Tenant Admin Panel (React + Chakra UI) - Store owner dashboard
+  tenant-admin:
+    build:
+      context: ./Frontend/tenant-admin
+      dockerfile: Dockerfile
+    ports:
+      - "3002:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_GRAPHQL_URL=http://localhost:4000/graphql
+    depends_on:
+      - config-service
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+  # Global Admin Panel (React + Ant Design) - Platform admin dashboard
+  global-admin:
+    build:
+      context: ./Frontend/global-admin
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_GRAPHQL_URL=http://localhost:4000/graphql
+    depends_on:
+      - config-service
+    networks:
+      - platform-network
+    restart: unless-stopped
+
+networks:
+  platform-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  elasticsearch-data:
+  prometheus-data:
+  grafana-data:
+  minio-data:
