@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import ApolloProvider from '@/providers/ApolloProvider';
 
 export function Providers({ 
   children
@@ -18,8 +19,10 @@ export function Providers({
   }));
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <ApolloProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </ApolloProvider>
   );
 }

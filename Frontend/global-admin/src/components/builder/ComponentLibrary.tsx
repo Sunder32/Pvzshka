@@ -19,6 +19,12 @@ interface ComponentLibraryProps {
 
 const components = [
   {
+    id: 'header',
+    name: 'Шапка сайта',
+    icon: <LayoutOutlined />,
+    description: 'Навигация, поиск, корзина',
+  },
+  {
     id: 'hero',
     name: 'Hero секция',
     icon: <PictureOutlined />,

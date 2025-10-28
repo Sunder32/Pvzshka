@@ -25,6 +25,9 @@ export default function PreviewFrame({
   onSectionDelete,
   onSectionReorder,
 }: PreviewFrameProps) {
+  // Логирование для отладки
+  console.log('🖼️ PreviewFrame render, sections count:', config?.layout?.sections?.length || 0);
+  
   // Проверяем config перед использованием
   if (!config) {
     return (
@@ -44,11 +47,22 @@ export default function PreviewFrame({
 
   // Мемоизируем валидные секции для предотвращения ре-рендера с устаревшими данными
   const validSections = useMemo(() => {
-    if (!config.layout?.sections) return [];
+    if (!config.layout?.sections) {
+      console.log('❌ No sections in config.layout');
+      return [];
+    }
+    
+    console.log('🔍 Filtering sections, total:', config.layout.sections.length);
     
     // КРИТИЧНО: Фильтруем ТАК ЖЕ как в SiteBuilder.tsx
-    return config.layout.sections
-      .filter((s: any) => s && s.id && s.type && s.config)
+    const filtered = config.layout.sections
+      .filter((s: any) => {
+        const isValid = s && s.id && s.type && s.config;
+        if (!isValid) {
+          console.log('❌ Invalid section:', s);
+        }
+        return isValid;
+      })
       .map((s: any) => ({
         id: s.id,
         type: s.type,
@@ -56,7 +70,10 @@ export default function PreviewFrame({
         order: s.order || 0,
       }))
       .sort((a: any, b: any) => a.order - b.order);
-  }, [config.layout?.sections]);
+      
+    console.log('✅ Valid sections after filter:', filtered.length, filtered);
+    return filtered;
+  }, [config]);
 
   const getFrameWidth = () => {
     switch (mode) {
@@ -108,56 +125,70 @@ export default function PreviewFrame({
           }
         }}
       >
-        {/* Section Toolbar */}
-        {isSelected && (
-          <div
-            style={{
-              position: 'absolute',
-              top: -40,
-              right: 0,
-              zIndex: 10,
-              background: '#fff',
-              border: '1px solid #d9d9d9',
-              borderRadius: 4,
-              padding: '4px 8px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Space size="small">
+        {/* Section Toolbar - показываем ВСЕГДА */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 10,
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid #d9d9d9',
+            borderRadius: 4,
+            padding: '4px 8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          <Space size="small">
+            <Button
+              size="small"
+              icon={<ArrowUpOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSectionReorder(section.id, 'up');
+              }}
+              title="Переместить вверх"
+            />
+            <Button
+              size="small"
+              icon={<ArrowDownOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSectionReorder(section.id, 'down');
+              }}
+              title="Переместить вниз"
+            />
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              type={isSelected ? 'primary' : 'default'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSectionSelect(section.id);
+              }}
+              title="Редактировать"
+            />
+            <Popconfirm
+              title="Удалить секцию?"
+              description="Это действие нельзя отменить"
+              onConfirm={(e) => {
+                e?.stopPropagation();
+                onSectionDelete(section.id);
+              }}
+              onCancel={(e) => e?.stopPropagation()}
+              okText="Удалить"
+              cancelText="Отмена"
+            >
               <Button
                 size="small"
-                icon={<ArrowUpOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSectionReorder(section.id, 'up');
-                }}
+                danger
+                icon={<DeleteOutlined />}
+                onClick={(e) => e.stopPropagation()}
+                title="Удалить секцию"
               />
-              <Button
-                size="small"
-                icon={<ArrowDownOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSectionReorder(section.id, 'down');
-                }}
-              />
-              <Popconfirm
-                title="Удалить секцию?"
-                onConfirm={(e) => {
-                  e?.stopPropagation();
-                  onSectionDelete(section.id);
-                }}
-                onCancel={(e) => e?.stopPropagation()}
-              >
-                <Button
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </Popconfirm>
-            </Space>
-          </div>
-        )}
+            </Popconfirm>
+          </Space>
+        </div>
 
         {/* Section Content - INLINE рендеринг без отдельного компонента */}
         {section && section.type && section.config && (() => {
@@ -166,6 +197,33 @@ export default function PreviewFrame({
           const sTheme = config.theme;
 
           switch (sType) {
+            case 'header':
+              return (
+                <div style={{
+                  background: sConfig.backgroundColor || '#fff',
+                  borderBottom: '1px solid #f0f0f0',
+                  padding: '16px 24px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderRadius: sTheme.borderRadius,
+                  marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: 24, fontWeight: 'bold', color: sConfig.textColor || sTheme.primaryColor }}>
+                    {sConfig.logoUrl ? (
+                      <img src={sConfig.logoUrl} alt="Logo" style={{ height: 40 }} />
+                    ) : (
+                      sConfig.storeName || 'Header'
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 24, alignItems: 'center', color: sConfig.textColor || '#000' }}>
+                    {sConfig.showSearch && <span>🔍 Поиск</span>}
+                    {sConfig.showCart && <span>🛒 Корзина</span>}
+                    {sConfig.showProfile && <span>👤 Профиль</span>}
+                  </div>
+                </div>
+              );
+
             case 'hero':
               return (
                 <div style={{
@@ -285,43 +343,64 @@ export default function PreviewFrame({
         transition: 'width 0.3s',
       }}
     >
-      {/* Header Preview */}
-      <div
-        style={{
-          background: '#fff',
-          borderBottom: '1px solid #f0f0f0',
-          padding: '16px 24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ fontSize: 24, fontWeight: 'bold', color: config.theme.primaryColor }}>
-          {config.logo.url ? (
-            <img src={config.logo.url} alt="Logo" style={{ height: 40 }} />
-          ) : (
-            'Marketplace'
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 24 }}>
-          <span style={{ cursor: 'pointer' }}>Каталог</span>
-          <span style={{ cursor: 'pointer' }}>О нас</span>
-          <span style={{ cursor: 'pointer' }}>Контакты</span>
-        </div>
-      </div>
+      {/* Header Preview - ДИНАМИЧЕСКИЙ */}
+      {(() => {
+        const headerSection = validSections.find((s: any) => s.type === 'header');
+        const headerConfig = headerSection?.config || {};
+        
+        return (
+          <div
+            style={{
+              background: headerConfig.backgroundColor || '#fff',
+              borderBottom: '1px solid #f0f0f0',
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: headerConfig.sticky ? 'sticky' : 'relative',
+              top: 0,
+              zIndex: 100,
+            }}
+          >
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: headerConfig.textColor || config.theme.primaryColor }}>
+              {headerConfig.logoUrl ? (
+                <img src={headerConfig.logoUrl} alt="Logo" style={{ height: 40 }} />
+              ) : (
+                headerConfig.storeName || 'Marketplace'
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+              {headerConfig.showSearch && (
+                <span style={{ cursor: 'pointer', color: headerConfig.textColor || '#000' }}>🔍 Поиск</span>
+              )}
+              <span style={{ cursor: 'pointer', color: headerConfig.textColor || '#000' }}>Каталог</span>
+              {headerConfig.showCart && (
+                <span style={{ cursor: 'pointer', color: headerConfig.textColor || '#000' }}>🛒 Корзина</span>
+              )}
+              {headerConfig.showProfile && (
+                <span style={{ cursor: 'pointer', color: headerConfig.textColor || '#000' }}>👤 Профиль</span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sections */}
       <div style={{ padding: 24 }}>
-        {validSections.map((section: any) => {
-          // КРИТИЧНО: Проверка перед рендерингом
-          if (!section || !section.id || !section.type || !section.config) {
-            console.error('Invalid section in map:', section);
-            return null;
-          }
+        {(() => {
+          console.log('🎨 Rendering all sections:', validSections.length, validSections.map((s: any) => s.type));
           
-          // Рендерим напрямую без обертки
-          return renderSection(section);
-        })}
+          return validSections.map((section: any) => {
+            // КРИТИЧНО: Проверка перед рендерингом
+            if (!section || !section.id || !section.type || !section.config) {
+              console.error('Invalid section in map:', section);
+              return null;
+            }
+            
+            // Рендерим напрямую без обертки
+            return renderSection(section);
+          });
+        })()}
 
         {validSections.length === 0 && (
           <div

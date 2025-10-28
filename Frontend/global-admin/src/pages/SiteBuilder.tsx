@@ -56,7 +56,7 @@ export default function SiteBuilder() {
           return;
         }
 
-        const response = await fetch('http://localhost:8080/api/tenants', {
+        const response = await fetch('http://localhost:4000/api/tenants', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -66,10 +66,14 @@ export default function SiteBuilder() {
           throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = await response.json();
-        setTenants(data.tenants || []);
-        if (data.tenants && data.tenants.length > 0) {
-          setSelectedTenantId(data.tenants[0].id);
+        const result = await response.json();
+        console.log('📋 API Response:', result);
+        const tenantsData = result.data || result.tenants || [];
+        console.log('📋 Loaded tenants:', tenantsData);
+        setTenants(tenantsData);
+        if (tenantsData.length > 0) {
+          console.log('✅ Selected first tenant ID:', tenantsData[0].id);
+          setSelectedTenantId(tenantsData[0].id);
         }
       } catch (error) {
         console.error('Error loading tenants:', error);
@@ -86,6 +90,15 @@ export default function SiteBuilder() {
     variables: { tenantId: selectedTenantId },
     skip: !selectedTenantId,
   });
+
+  // Сбрасываем состояние при смене тенанта
+  useEffect(() => {
+    if (selectedTenantId) {
+      console.log('🔄 Tenant changed to:', selectedTenantId);
+      setHasChanges(false);
+      setSelectedSection(null);
+    }
+  }, [selectedTenantId]);
 
   // Mutations
   const [saveSiteConfig, { loading: saving }] = useMutation(SAVE_SITE_CONFIG);
@@ -115,15 +128,42 @@ export default function SiteBuilder() {
   // Load config from GraphQL
   useEffect(() => {
     if (data?.siteConfig) {
-      // Sanitize sections - создаем НОВЫЙ массив только с валидными секциями
+      console.log('📥 Loading config from server for tenant:', selectedTenantId);
+      console.log('📥 Raw data from server:', JSON.stringify(data.siteConfig, null, 2));
+      console.log('📥 Sections count from server:', data.siteConfig.layout?.sections?.length || 0);
+      
+      let needsMigration = false;
+      
       const validSections = (data.siteConfig.layout?.sections || [])
-        .filter((s: any) => s && s.id && s.type && s.config)
-        .map((s: any) => ({
-          id: s.id,
-          type: s.type,
-          config: s.config,
-          order: s.order || 0,
-        }));
+        .filter((s: any) => s && s.id && s.type)
+        .map((s: any) => {
+          // Проверяем, пустой ли config (нет ключей или сам объект undefined/null)
+          const configIsEmpty = !s.config || Object.keys(s.config).length === 0;
+          
+          if (configIsEmpty) {
+            console.log(`🔧 Migrating section ${s.type}(${s.id}) - adding default config`);
+            needsMigration = true;
+            const defaultConfig = getDefaultConfig(s.type);
+            console.log(`🔧 Default config for ${s.type}:`, defaultConfig);
+            
+            return {
+              id: s.id,
+              type: s.type,
+              config: defaultConfig,
+              order: s.order || 0,
+            };
+          }
+          
+          return {
+            id: s.id,
+            type: s.type,
+            config: s.config,
+            order: s.order || 0,
+          };
+        });
+
+      console.log('✅ Valid sections loaded:', validSections.length, validSections.map((s: any) => `${s.type}(${s.id})`));
+      console.log('✅ Full sections data:', JSON.stringify(validSections, null, 2));
 
       setConfig({
         theme: data.siteConfig.theme || {
@@ -141,8 +181,17 @@ export default function SiteBuilder() {
           sections: validSections,
         },
       });
+      
+      // Если была миграция, автоматически сохраняем
+      if (needsMigration) {
+        console.log('💾 Auto-saving migrated data...');
+        setHasChanges(true);
+        message.warning('Обнаружены секции без настроек. Нажмите "Сохранить" для применения дефолтных значений.', 5);
+      } else {
+        setHasChanges(false);
+      }
     }
-  }, [data]);
+  }, [data, selectedTenantId]);
 
   const handleThemeChange = (themeUpdates: Partial<SiteConfig['theme']>) => {
     setConfig((prev) => ({
@@ -160,26 +209,36 @@ export default function SiteBuilder() {
       order: config.layout.sections.length,
     };
 
-    setConfig((prev) => ({
-      ...prev,
-      layout: {
-        sections: [...prev.layout.sections, newSection],
-      },
-    }));
+    console.log('➕ Adding new section:', sectionType, 'with ID:', newSection.id);
+    
+    setConfig((prev) => {
+      const newConfig = {
+        ...prev,
+        layout: {
+          sections: [...prev.layout.sections, newSection],
+        },
+      };
+      console.log('✅ New config state:', newConfig);
+      return newConfig;
+    });
     setHasChanges(true);
+    message.success(`Секция "${sectionType}" добавлена`);
   };
 
   const handleSectionUpdate = (sectionId: string, updates: any) => {
+    console.log('🔄 Updating section:', sectionId, 'with updates:', updates);
     setConfig((prev) => {
       // Создаем НОВЫЙ массив только с валидными секциями
       const validSections = prev.layout.sections
         .filter((s) => s && s.id && s.type && s.config)
         .map((section) => {
           if (section.id === sectionId) {
+            const newConfig = { ...section.config, ...updates };
+            console.log('✅ Section updated:', section.type, 'new config:', newConfig);
             return {
               id: section.id,
               type: section.type,
-              config: { ...section.config, ...updates },
+              config: newConfig,
               order: section.order,
             };
           }
@@ -264,7 +323,22 @@ export default function SiteBuilder() {
 
   const handleSave = async () => {
     try {
-      await saveSiteConfig({
+      // Фильтруем только валидные секции перед сохранением
+      const validSections = config.layout.sections
+        .filter(s => s && s.id && s.type && s.config)
+        .map((s) => ({
+          id: s.id,
+          type: s.type,
+          order: s.order,
+          visible: true,
+          config: s.config,
+        }));
+
+      console.log('💾 Saving config for tenant:', selectedTenantId);
+      console.log('💾 Sections to save:', validSections.length, validSections.map(s => `${s.type}(${s.id})`));
+      console.log('💾 Full sections data:', JSON.stringify(validSections, null, 2));
+
+      const result = await saveSiteConfig({
         variables: {
           tenantId: selectedTenantId,
           logo: config.logo.url,
@@ -286,22 +360,23 @@ export default function SiteBuilder() {
               showSocial: true,
               columns: [],
             },
-            sections: config.layout.sections.map((s) => ({
-              id: s.id,
-              type: s.type,
-              order: s.order,
-              visible: true,
-              config: s.config,
-            })),
+            sections: validSections,
           },
         },
       });
+      
+      console.log('✅ Save result:', result);
       message.success('Настройки сохранены!');
       setHasChanges(false);
-      refetch();
+      
+      // Не вызываем refetch сразу, даём серверу время обработать
+      setTimeout(() => {
+        console.log('🔄 Refetching data...');
+        refetch();
+      }, 500);
     } catch (error) {
       message.error('Ошибка при сохранении');
-      console.error(error);
+      console.error('❌ Save error:', error);
     }
   };
 
@@ -382,9 +457,11 @@ export default function SiteBuilder() {
             background: '#fff',
             borderBottom: '1px solid #f0f0f0',
             padding: '12px 24px',
+            paddingRight: selectedSection ? '344px' : '24px', // Добавляем отступ справа когда открыта панель (320px + 24px padding)
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            transition: 'padding-right 0.3s ease',
           }}
         >
           <Space>
@@ -410,14 +487,36 @@ export default function SiteBuilder() {
 
           <Space>
             {hasChanges && (
-              <Button icon={<UndoOutlined />} onClick={() => window.location.reload()}>
+              <Button icon={<UndoOutlined />} onClick={() => {
+                refetch();
+              }}>
                 Отменить
               </Button>
             )}
-            <Button icon={<SaveOutlined />} onClick={handleSave} disabled={!hasChanges}>
+            <Button 
+              icon={<CloudUploadOutlined />} 
+              onClick={() => {
+                refetch();
+                message.info('Превью обновлено');
+              }}
+              title="Обновить превью с сервера"
+            >
+              Обновить
+            </Button>
+            <Button 
+              icon={<SaveOutlined />} 
+              onClick={handleSave} 
+              loading={saving}
+              disabled={!hasChanges}
+            >
               Сохранить
             </Button>
-            <Button type="primary" icon={<EyeOutlined />} onClick={handlePublish}>
+            <Button 
+              type="primary" 
+              icon={<EyeOutlined />} 
+              onClick={handlePublish}
+              loading={publishing}
+            >
               Опубликовать
             </Button>
           </Space>
@@ -426,6 +525,7 @@ export default function SiteBuilder() {
         {/* Preview Area */}
         <div style={{ padding: '24px', display: 'flex', justifyContent: 'center' }}>
           <PreviewFrame
+            key={JSON.stringify(config.layout.sections.map(s => s?.id))}
             config={config}
             mode={previewMode}
             selectedSection={selectedSection}
@@ -443,13 +543,57 @@ export default function SiteBuilder() {
         if (!section) return null;
         
         return (
-          <Sider width={320} theme="light" style={{ borderLeft: '1px solid #f0f0f0' }}>
-            <div style={{ padding: '16px' }}>
-              <h3>Настройки секции</h3>
-              <LayoutBuilder
-                section={section}
-                onChange={(updates: any) => handleSectionUpdate(selectedSection, updates)}
-              />
+          <Sider 
+            width={320} 
+            theme="light" 
+            style={{ 
+              borderLeft: '1px solid #f0f0f0',
+              position: 'fixed',
+              right: 0,
+              top: 0,
+              height: '100vh',
+              overflowY: 'auto',
+              zIndex: 100,
+              boxShadow: '-2px 0 8px rgba(0,0,0,0.08)',
+            }}
+          >
+            <div style={{ 
+              padding: '16px',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '16px',
+                borderBottom: '1px solid #f0f0f0',
+                paddingBottom: '12px',
+                position: 'sticky',
+                top: 0,
+                background: '#fff',
+                zIndex: 1,
+              }}>
+                <h3 style={{ margin: 0 }}>Настройки секции</h3>
+                <Button
+                  type="text"
+                  icon={<span style={{ fontSize: '18px' }}>✕</span>}
+                  onClick={() => setSelectedSection(null)}
+                  title="Закрыть панель настроек"
+                  style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                <LayoutBuilder
+                  section={section}
+                  onChange={(updates: any) => handleSectionUpdate(selectedSection, updates)}
+                />
+              </div>
             </div>
           </Sider>
         );
@@ -460,6 +604,15 @@ export default function SiteBuilder() {
 
 function getDefaultConfig(type: string): any {
   const defaults: Record<string, any> = {
+    header: {
+      sticky: false,
+      showSearch: true,
+      showProfile: true,
+      showCart: true,
+      backgroundColor: '#ffffff',
+      textColor: '#000000',
+      height: 64,
+    },
     hero: {
       title: 'Заголовок',
       subtitle: 'Подзаголовок',
