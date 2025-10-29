@@ -738,9 +738,18 @@ function getDefaultConfig(type: string): any {
       showSearch: true,
       showProfile: true,
       showCart: true,
+      showLogo: true,
+      logoUrl: '',
+      storeName: 'Marketplace',
       backgroundColor: '#ffffff',
       textColor: '#000000',
       height: 64,
+      menu: [
+        { id: 'menu-1', label: 'Главная', url: '/', order: 0 },
+        { id: 'menu-2', label: 'Каталог', url: '/catalog', order: 1 },
+        { id: 'menu-3', label: 'О нас', url: '/about', order: 2 },
+        { id: 'menu-4', label: 'Контакты', url: '/contacts', order: 3 },
+      ],
     },
     hero: {
       title: 'Заголовок',

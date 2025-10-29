@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout, Card, Tabs, Button, Space, message, Spin, Select, Alert } from 'antd';
-import { SaveOutlined, EyeOutlined, UndoOutlined, CloudUploadOutlined } from '@ant-design/icons';
+import { SaveOutlined, EyeOutlined, UndoOutlined, CloudUploadOutlined, EditOutlined } from '@ant-design/icons';
 import ThemeEditor from '../components/builder/ThemeEditor';
 import LayoutBuilder from '../components/builder/LayoutBuilder';
 import ComponentLibrary from '../components/builder/ComponentLibrary';
@@ -43,8 +43,18 @@ function getDefaultConfig(type: string): any {
       showProfile: true,
       showCart: true,
       showWishlist: true,
+      showLogo: true,
+      logoUrl: '',
+      storeName: 'Marketplace',
       backgroundColor: '#ffffff',
       textColor: '#333333',
+      height: 64,
+      menu: [
+        { id: 'menu-1', label: 'Главная', url: '/', order: 0 },
+        { id: 'menu-2', label: 'Каталог', url: '/catalog', order: 1 },
+        { id: 'menu-3', label: 'О нас', url: '/about', order: 2 },
+        { id: 'menu-4', label: 'Контакты', url: '/contacts', order: 3 },
+      ],
     },
     hero: {
       title: 'Заголовок',
@@ -559,6 +569,12 @@ export default function SiteBuilder() {
           </Space>
 
           <Space>
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/pages-editor/${siteId || activeSite?.id}`)}
+            >
+              Редактор страниц
+            </Button>
             {hasChanges && (
               <Button icon={<UndoOutlined />} onClick={() => refetch()}>
                 Отменить

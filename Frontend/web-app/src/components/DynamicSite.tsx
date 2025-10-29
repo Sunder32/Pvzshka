@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { gql, useQuery } from '@apollo/client'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import Header from './Header'
 
 const GET_SITE_CONFIG = gql`
   query GetSiteConfig($subdomain: String!) {
@@ -34,8 +33,9 @@ interface DynamicSiteProps {
 export default function DynamicSite({ subdomain }: DynamicSiteProps) {
   const { data, loading, error, refetch } = useQuery(GET_SITE_CONFIG, {
     variables: { subdomain },
-    fetchPolicy: 'network-only', // Всегда загружать с сервера
-    pollInterval: 5000, // Обновлять каждые 5 секунд
+    fetchPolicy: 'network-only', // Всегда загружать с сервера (без Apollo кеша)
+    nextFetchPolicy: 'network-only', // После первого запроса тоже network-only
+    // pollInterval убран - обновление происходит только при изменении subdomain
   })
 
   // Принудительное обновление при изменении subdomain
@@ -104,7 +104,7 @@ function SectionRenderer({ section, theme, logo }: SectionRendererProps) {
 
   switch (type) {
     case 'header':
-      return <Header />
+      return <HeaderSection config={config} theme={theme} logo={logo} />
     case 'hero':
       return <HeroSection config={config} theme={theme} logo={logo} />
     case 'features':
@@ -122,6 +122,229 @@ function SectionRenderer({ section, theme, logo }: SectionRendererProps) {
     default:
       return null
   }
+}
+
+// Icon mapping utility
+const getMenuIcon = (iconName: string) => {
+  const iconStyle = { width: 18, height: 18, strokeWidth: 2 };
+  
+  switch (iconName) {
+    case 'home':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m3 12 2-2m0 0 7-7 7 7M5 10v10a1 1 0 0 0 1 1h3m10-11 2 2m-2-2v10a1 1 0 0 1-1 1h-3m-6 0a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1m-6 0h6" />
+        </svg>
+      );
+    case 'catalog':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      );
+    case 'cart':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13 5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
+        </svg>
+      );
+    case 'user':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z" />
+        </svg>
+      );
+    case 'heart':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+        </svg>
+      );
+    case 'info':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+        </svg>
+      );
+    case 'phone':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+        </svg>
+      );
+    case 'mail':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+        </svg>
+      );
+    case 'star':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+        </svg>
+      );
+    case 'tag':
+      return (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={iconStyle}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 6h.008v.008H6V6Z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
+// Header Section (Dynamic)
+function HeaderSection({ config, theme, logo }: any) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const menu = config.menu || []
+  const sortedMenu = [...menu].sort((a, b) => (a.order || 0) - (b.order || 0))
+
+  const headerStyle = {
+    backgroundColor: config.backgroundColor || '#ffffff',
+    color: config.textColor || '#000000',
+    height: `${config.height || 64}px`,
+    boxShadow: scrolled ? '0 4px 12px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.05)',
+    backdropFilter: scrolled ? 'blur(10px)' : 'none',
+    transition: 'all 0.3s ease',
+  }
+
+  return (
+    <header 
+      className={config.sticky ? 'sticky top-0 z-50' : ''}
+      style={headerStyle}
+    >
+      <div className="container mx-auto px-6 h-full flex items-center justify-between">
+        {/* Logo */}
+        {config.showLogo !== false && (
+          <a href="/" className="flex items-center gap-3 group">
+            {config.logoUrl && (
+              <div className="relative">
+                <img 
+                  src={config.logoUrl} 
+                  alt="Logo" 
+                  className="h-12 w-12 object-contain transition-transform group-hover:scale-110"
+                />
+              </div>
+            )}
+            <span className="text-2xl font-bold tracking-tight transition-colors group-hover:opacity-80">
+              {config.storeName || 'Marketplace'}
+            </span>
+          </a>
+        )}
+
+        {/* Menu Navigation - Desktop */}
+        <nav className="hidden md:flex items-center gap-8">
+          {sortedMenu.map((item: any) => (
+            <a
+              key={item.id}
+              href={item.url}
+              className="relative font-medium transition-all hover:scale-105 flex items-center gap-2"
+              style={{ 
+                color: config.textColor || '#000000',
+              }}
+            >
+              {item.icon && item.icon !== 'none' && getMenuIcon(item.icon)}
+              <span className="relative">
+                {item.label}
+                <span 
+                  className="absolute bottom-0 left-0 w-0 h-0.5 transition-all hover:w-full"
+                  style={{ backgroundColor: theme?.primaryColor || '#0066cc' }}
+                />
+              </span>
+            </a>
+          ))}
+        </nav>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3">
+          {config.showSearch && (
+            <button 
+              className="p-2.5 rounded-xl transition-all hover:bg-gray-100 hover:scale-110"
+              aria-label="Поиск"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          )}
+          {config.showCart && (
+            <button 
+              className="relative p-2.5 rounded-xl transition-all hover:bg-gray-100 hover:scale-110"
+              aria-label="Корзина"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+          )}
+          {config.showProfile && (
+            <button 
+              className="p-2.5 rounded-xl transition-all hover:bg-gray-100 hover:scale-110"
+              aria-label="Профиль"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Меню"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div 
+          className="md:hidden absolute w-full shadow-lg animate-fade-in"
+          style={{ 
+            backgroundColor: config.backgroundColor || '#ffffff',
+            borderTop: `1px solid ${theme?.primaryColor || '#e5e7eb'}40`
+          }}
+        >
+          <nav className="container mx-auto px-6 py-4 flex flex-col gap-3">
+            {sortedMenu.map((item: any) => (
+              <a
+                key={item.id}
+                href={item.url}
+                className="px-4 py-3 rounded-lg transition-all hover:bg-gray-50 flex items-center gap-3"
+                style={{ color: config.textColor || '#000000' }}
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {item.icon && item.icon !== 'none' && getMenuIcon(item.icon)}
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      )}
+    </header>
+  )
 }
 
 // Hero Section
@@ -154,106 +377,396 @@ function HeroVariant({ variant, config, theme, logo }: any) {
 function HeroGradient({ config, theme, logo }: any) {
   const { scrollY } = useScroll()
   const y = useTransform(scrollY, [0, 500], [0, 150])
-  const opacity = useTransform(scrollY, [0, 300], [1, 0])
 
   return (
     <section
       style={{
         background: `linear-gradient(135deg, ${config.gradientStart || theme.primaryColor}, ${config.gradientEnd || theme.secondaryColor})`,
         color: config.textColor || '#ffffff',
-        padding: '120px 0',
+        padding: '140px 0 120px',
         position: 'relative',
         overflow: 'hidden',
+        minHeight: '700px',
+        display: 'flex',
+        alignItems: 'center',
       }}
     >
-      {/* Animated background elements */}
+      {/* Animated gradient orbs */}
       <motion.div
         style={{
           position: 'absolute',
-          top: '10%',
-          right: '10%',
-          width: '400px',
-          height: '400px',
+          top: '-10%',
+          right: '5%',
+          width: '500px',
+          height: '500px',
           borderRadius: '50%',
-          background: 'rgba(255,255,255,0.1)',
-          filter: 'blur(80px)',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+          filter: 'blur(60px)',
         }}
         animate={{
-          scale: [1, 1.2, 1],
-          x: [0, 50, 0],
-          y: [0, 30, 0],
+          scale: [1, 1.3, 1],
+          x: [0, 30, 0],
+          y: [0, 50, 0],
+          rotate: [0, 90, 0],
         }}
         transition={{
-          duration: 8,
+          duration: 20,
           repeat: Infinity,
-          ease: 'easeInOut',
+          ease: 'linear',
         }}
       />
       <motion.div
         style={{
           position: 'absolute',
-          bottom: '10%',
-          left: '10%',
+          bottom: '-5%',
+          left: '-5%',
+          width: '400px',
+          height: '400px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)',
+          filter: 'blur(50px)',
+        }}
+        animate={{
+          scale: [1, 1.4, 1],
+          x: [0, -20, 0],
+          y: [0, -30, 0],
+          rotate: [0, -90, 0],
+        }}
+        transition={{
+          duration: 15,
+          repeat: Infinity,
+          ease: 'linear',
+        }}
+      />
+      <motion.div
+        style={{
+          position: 'absolute',
+          top: '40%',
+          left: '50%',
           width: '300px',
           height: '300px',
           borderRadius: '50%',
-          background: 'rgba(255,255,255,0.08)',
-          filter: 'blur(60px)',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)',
+          filter: 'blur(70px)',
         }}
         animate={{
-          scale: [1, 1.3, 1],
-          x: [0, -40, 0],
-          y: [0, -20, 0],
+          scale: [1, 1.5, 1],
+          x: [-150, -100, -150],
+          y: [-150, -100, -150],
         }}
         transition={{
-          duration: 10,
+          duration: 12,
           repeat: Infinity,
           ease: 'easeInOut',
         }}
       />
 
+      {/* Floating particles */}
+      {[...Array(15)].map((_, i) => (
+        <motion.div
+          key={i}
+          style={{
+            position: 'absolute',
+            width: `${Math.random() * 4 + 2}px`,
+            height: `${Math.random() * 4 + 2}px`,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.4)',
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            x: [0, Math.random() * 20 - 10, 0],
+            opacity: [0.2, 0.8, 0.2],
+          }}
+          transition={{
+            duration: Math.random() * 5 + 3,
+            repeat: Infinity,
+            delay: Math.random() * 2,
+            ease: 'easeInOut',
+          }}
+        />
+      ))}
+
+      {/* Grid pattern with shimmer */}
       <motion.div 
-        className="container mx-auto px-4"
-        style={{ y, opacity }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+          opacity: 0.6,
+        }}
+        animate={{
+          backgroundPosition: ['0px 0px', '60px 60px'],
+        }}
+        transition={{
+          duration: 20,
+          repeat: Infinity,
+          ease: 'linear',
+        }}
+      />
+
+      <motion.div 
+        className="container mx-auto px-6 relative z-10"
+        style={{ y }}
       >
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.h1
-            className="text-6xl md:text-7xl font-bold mb-6"
-            initial={{ opacity: 0, y: 30 }}
+        <div className="max-w-5xl mx-auto text-center">
+          {/* Badge with glow effect */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            transition={{ duration: 0.6 }}
+            style={{
+              display: 'inline-block',
+              padding: '10px 24px',
+              background: 'rgba(255,255,255,0.1)',
+              borderRadius: '100px',
+              marginBottom: '32px',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)',
+              position: 'relative',
+            }}
           >
-            {config.title || 'Заголовок'}
-          </motion.h1>
-          <motion.p
-            className="text-xl md:text-2xl mb-10 opacity-90"
+            <motion.div
+              style={{
+                position: 'absolute',
+                inset: -1,
+                borderRadius: '100px',
+                padding: '1px',
+                background: 'linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.1), rgba(255,255,255,0.5))',
+                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                WebkitMaskComposite: 'xor',
+                maskComposite: 'exclude',
+              }}
+              animate={{
+                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: 'linear',
+              }}
+            />
+            <span style={{ 
+              fontSize: '13px', 
+              fontWeight: 600, 
+              letterSpacing: '1.5px',
+              textTransform: 'uppercase',
+              position: 'relative',
+              zIndex: 1,
+            }}>
+              {config.badge || '✨ Новая коллекция'}
+            </span>
+          </motion.div>
+
+          {/* Main heading with gradient shimmer */}
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+            transition={{ duration: 0.8, delay: 0.1 }}
+            style={{ marginBottom: '28px' }}
+          >
+            <h1
+              style={{
+                fontSize: 'clamp(3rem, 10vw, 5.5rem)',
+                fontWeight: 900,
+                lineHeight: 1.05,
+                letterSpacing: '-0.02em',
+                color: config.textColor || '#ffffff',
+                textShadow: '0 4px 60px rgba(0,0,0,0.3), 0 2px 20px rgba(0,0,0,0.2)',
+                position: 'relative',
+              }}
+            >
+              {config.title || 'Заголовок'}
+            </h1>
+          </motion.div>
+
+          {/* Subtitle with fade-in */}
+          <motion.p
+            style={{
+              fontSize: 'clamp(1.15rem, 2.5vw, 1.5rem)',
+              marginBottom: '56px',
+              opacity: 0.92,
+              lineHeight: 1.7,
+              maxWidth: '750px',
+              margin: '0 auto 56px',
+              fontWeight: 400,
+            }}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 0.92, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
           >
             {config.subtitle || 'Подзаголовок'}
           </motion.p>
+
+          {/* CTA Buttons with 3D effect */}
           {config.buttonText && (
-            <motion.button
-              style={{
-                backgroundColor: config.buttonColor || '#ffffff',
-                color: config.buttonTextColor || theme.primaryColor,
-                padding: '18px 40px',
-                borderRadius: theme.borderRadius || 12,
-                fontWeight: 600,
-                fontSize: '18px',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-              }}
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
-              whileHover={{ scale: 1.05, boxShadow: '0 15px 40px rgba(0,0,0,0.3)' }}
-              whileTap={{ scale: 0.95 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+              style={{ 
+                display: 'flex', 
+                gap: '20px', 
+                justifyContent: 'center', 
+                flexWrap: 'wrap',
+                marginBottom: '72px',
+              }}
             >
-              {config.buttonText}
-            </motion.button>
+              <motion.a
+                href={config.buttonLink || '#'}
+                style={{
+                  backgroundColor: config.buttonColor || '#ffffff',
+                  color: config.buttonTextColor || theme.primaryColor,
+                  padding: '18px 52px',
+                  borderRadius: '16px',
+                  fontWeight: 700,
+                  fontSize: '17px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1)',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.2)',
+                  y: -2,
+                }}
+                whileTap={{ scale: 0.98, y: 0 }}
+              >
+                <motion.div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                  }}
+                  initial={{ x: '-100%' }}
+                  whileHover={{ x: '100%' }}
+                  transition={{ duration: 0.6 }}
+                />
+                <span style={{ position: 'relative', zIndex: 1 }}>{config.buttonText}</span>
+                <motion.svg 
+                  width="20" 
+                  height="20" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  style={{ position: 'relative', zIndex: 1 }}
+                  whileHover={{ x: 3 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </motion.svg>
+              </motion.a>
+              {config.secondaryButtonText && (
+                <motion.a
+                  href={config.secondaryButtonLink || '#'}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    color: '#ffffff',
+                    padding: '18px 52px',
+                    borderRadius: '16px',
+                    fontWeight: 700,
+                    fontSize: '17px',
+                    border: '2px solid rgba(255,255,255,0.25)',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(20px)',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    borderColor: 'rgba(255,255,255,0.4)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                    y: -2,
+                  }}
+                  whileTap={{ scale: 0.98, y: 0 }}
+                >
+                  <span>{config.secondaryButtonText}</span>
+                </motion.a>
+              )}
+            </motion.div>
+          )}
+
+          {/* Stats/Features with 3D cards */}
+          {config.showStats && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              style={{
+                display: 'flex',
+                gap: '24px',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
+              {[
+                { label: 'Товаров', value: '10,000+', icon: '📦' },
+                { label: 'Клиентов', value: '50,000+', icon: '👥' },
+                { label: 'Отзывов', value: '4.9★', icon: '⭐' },
+              ].map((stat, idx) => (
+                <motion.div 
+                  key={idx} 
+                  style={{ 
+                    textAlign: 'center',
+                    padding: '28px 40px',
+                    background: 'rgba(255,255,255,0.08)',
+                    borderRadius: '20px',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                    minWidth: '180px',
+                  }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 + idx * 0.1 }}
+                  whileHover={{ 
+                    y: -8, 
+                    boxShadow: '0 16px 48px rgba(0,0,0,0.2)',
+                    background: 'rgba(255,255,255,0.12)',
+                  }}
+                >
+                  <div style={{ 
+                    fontSize: '2rem', 
+                    marginBottom: '8px',
+                    filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))',
+                  }}>
+                    {stat.icon}
+                  </div>
+                  <div style={{ 
+                    fontSize: '2.75rem', 
+                    fontWeight: 900, 
+                    marginBottom: '6px',
+                    letterSpacing: '-0.02em',
+                  }}>
+                    {stat.value}
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.85rem', 
+                    opacity: 0.85, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '1.5px',
+                    fontWeight: 600,
+                  }}>
+                    {stat.label}
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
           )}
         </div>
       </motion.div>
@@ -756,18 +1269,19 @@ function ProductsSection({ config, theme }: any) {
               style={{
                 position: 'relative',
                 backgroundColor: '#ffffff',
-                borderRadius: theme.borderRadius || 16,
+                borderRadius: '20px',
                 overflow: 'hidden',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                 cursor: 'pointer',
+                border: '1px solid rgba(0,0,0,0.06)',
               }}
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               whileHover={{ 
-                y: -10,
-                boxShadow: '0 20px 40px rgba(0,0,0,0.12)',
+                y: -12,
+                boxShadow: '0 25px 50px rgba(0,0,0,0.15)',
                 transition: { duration: 0.3 }
               }}
             >
@@ -776,24 +1290,53 @@ function ProductsSection({ config, theme }: any) {
                 <motion.div
                   style={{
                     position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    backgroundColor: '#ef4444',
+                    top: '16px',
+                    right: '16px',
+                    background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
                     color: '#ffffff',
-                    padding: '6px 12px',
-                    borderRadius: '20px',
-                    fontSize: '14px',
-                    fontWeight: 'bold',
+                    padding: '8px 16px',
+                    borderRadius: '30px',
+                    fontSize: '13px',
+                    fontWeight: 800,
                     zIndex: 10,
+                    boxShadow: '0 4px 12px rgba(244,63,94,0.4)',
+                    letterSpacing: '0.5px',
                   }}
                   initial={{ scale: 0, rotate: -180 }}
                   whileInView={{ scale: 1, rotate: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: index * 0.1 + 0.3 }}
+                  transition={{ type: 'spring', duration: 0.6, delay: index * 0.1 + 0.3 }}
+                  whileHover={{ scale: 1.1 }}
                 >
                   -{product.discount}%
                 </motion.div>
               )}
+
+              {/* Favorite button */}
+              <motion.button
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  left: '16px',
+                  backgroundColor: 'rgba(255,255,255,0.95)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                }}
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg width="20" height="20" fill="none" stroke="#ef4444" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </motion.button>
 
               {/* Image placeholder */}
               <div
@@ -805,35 +1348,70 @@ function ProductsSection({ config, theme }: any) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '48px',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
+                {/* Shimmer effect */}
+                <motion.div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '-100%',
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                  }}
+                  animate={{
+                    left: ['100%', '-100%'],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: 'linear',
+                  }}
+                />
                 📦
               </div>
 
               {/* Content */}
-              <div style={{ padding: '20px' }}>
+              <div style={{ padding: '24px' }}>
                 <h3 
                   style={{ 
                     fontSize: '18px', 
-                    fontWeight: 600, 
+                    fontWeight: 700, 
                     marginBottom: '12px',
                     color: '#1f2937',
+                    lineHeight: 1.4,
                   }}
                 >
                   {product.name}
                 </h3>
 
+                {/* Rating */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} width="16" height="16" fill="#fbbf24" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  ))}
+                  <span style={{ fontSize: '13px', color: '#6b7280', marginLeft: '4px' }}>
+                    (128)
+                  </span>
+                </div>
+
                 {/* Price */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     <span 
                       style={{ 
-                        fontSize: '24px', 
-                        fontWeight: 'bold', 
+                        fontSize: '28px', 
+                        fontWeight: 800, 
                         color: theme.primaryColor,
+                        letterSpacing: '-0.5px',
                       }}
                     >
-                      {product.price} ₽
+                      {product.price.toLocaleString()} ₽
                     </span>
                     {product.oldPrice && (
                       <span 
@@ -841,9 +1419,10 @@ function ProductsSection({ config, theme }: any) {
                           fontSize: '16px', 
                           color: '#9ca3af',
                           textDecoration: 'line-through',
+                          fontWeight: 500,
                         }}
                       >
-                        {product.oldPrice} ₽
+                        {product.oldPrice.toLocaleString()} ₽
                       </span>
                     )}
                   </div>
@@ -853,21 +1432,29 @@ function ProductsSection({ config, theme }: any) {
                 <motion.button
                   style={{
                     width: '100%',
-                    backgroundColor: theme.primaryColor,
+                    background: `linear-gradient(135deg, ${theme.primaryColor} 0%, ${theme.secondaryColor || theme.primaryColor} 100%)`,
                     color: '#ffffff',
-                    padding: '12px 24px',
-                    borderRadius: theme.borderRadius || 8,
-                    fontWeight: 600,
-                    fontSize: '16px',
+                    padding: '14px 24px',
+                    borderRadius: '12px',
+                    fontWeight: 700,
+                    fontSize: '15px',
                     border: 'none',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: `0 4px 12px ${theme.primaryColor}40`,
                   }}
                   whileHover={{ 
-                    scale: 1.05,
-                    backgroundColor: theme.secondaryColor || theme.primaryColor,
+                    scale: 1.03,
+                    boxShadow: `0 6px 20px ${theme.primaryColor}60`,
                   }}
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{ scale: 0.97 }}
                 >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                   В корзину
                 </motion.button>
               </div>
@@ -881,29 +1468,99 @@ function ProductsSection({ config, theme }: any) {
 
 // Categories Section
 function CategoriesSection({ config, theme }: any) {
+  const categories = config.categories || [
+    { name: 'Электроника', icon: '💻', color: '#3b82f6' },
+    { name: 'Одежда', icon: '👕', color: '#8b5cf6' },
+    { name: 'Дом и сад', icon: '🏡', color: '#10b981' },
+    { name: 'Спорт', icon: '⚽', color: '#f59e0b' },
+  ];
+
   return (
-    <section style={{ padding: '60px 0', backgroundColor: '#f9fafb' }}>
-      <div className="container mx-auto px-4">
-        <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '32px', color: theme.primaryColor }}>
-          {config.title || 'Плитка категорий'}
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(config.categories || []).map((cat: any, index: number) => (
-            <div
+    <section style={{ padding: '80px 0', backgroundColor: '#f9fafb' }}>
+      <div className="container mx-auto px-6">
+        <motion.h2 
+          style={{ 
+            fontSize: '42px', 
+            fontWeight: 800, 
+            marginBottom: '56px', 
+            color: theme.primaryColor,
+            textAlign: 'center',
+          }}
+          initial={{ opacity: 0, y: -20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          {config.title || 'Популярные категории'}
+        </motion.h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {categories.map((cat: any, index: number) => (
+            <motion.div
               key={index}
               style={{
-                backgroundColor: '#ffffff',
-                padding: '24px',
-                borderRadius: theme.borderRadius || 8,
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                padding: '32px 24px',
+                borderRadius: '20px',
                 textAlign: 'center',
                 cursor: 'pointer',
-                border: '1px solid #e5e7eb',
-                transition: 'all 0.3s',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ 
+                y: -8,
+                boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
+                transition: { duration: 0.3 }
               }}
             >
-              <div style={{ fontSize: '48px', marginBottom: '8px' }}>{cat.icon || '📦'}</div>
-              <div style={{ fontWeight: 600 }}>{cat.name}</div>
-            </div>
+              {/* Background gradient on hover */}
+              <motion.div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: `linear-gradient(135deg, ${cat.color}15 0%, ${cat.color}05 100%)`,
+                  opacity: 0,
+                }}
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+
+              <motion.div 
+                style={{ 
+                  fontSize: '64px', 
+                  marginBottom: '16px',
+                  position: 'relative',
+                  zIndex: 1,
+                }}
+                whileHover={{ scale: 1.15, rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 0.5 }}
+              >
+                {cat.icon || '📦'}
+              </motion.div>
+              <div style={{ 
+                fontWeight: 700, 
+                fontSize: '18px',
+                color: '#1f2937',
+                position: 'relative',
+                zIndex: 1,
+              }}>
+                {cat.name}
+              </div>
+              <div style={{
+                fontSize: '13px',
+                color: '#6b7280',
+                marginTop: '8px',
+                position: 'relative',
+                zIndex: 1,
+              }}>
+                {Math.floor(Math.random() * 500) + 100}+ товаров
+              </div>
+            </motion.div>
           ))}
         </div>
       </div>

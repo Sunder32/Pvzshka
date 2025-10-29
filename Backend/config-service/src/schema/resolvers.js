@@ -57,9 +57,10 @@ export const resolvers = {
     },
 
     async siteConfigBySubdomain(_, { subdomain }) {
-      const cacheKey = `siteConfig:subdomain:${subdomain}`;
-      const cached = await getCached(cacheKey);
-      if (cached) return cached;
+      // ОТКЛЮЧЕН SERVER-SIDE КЕШ - клиент использует network-only fetchPolicy
+      // const cacheKey = `siteConfig:subdomain:${subdomain}`;
+      // const cached = await getCached(cacheKey);
+      // if (cached) return cached;
 
       const result = await getPool().query(
         `SELECT sc.*, s.site_name, s.domain, s.category
@@ -76,7 +77,8 @@ export const resolvers = {
       }
 
       const siteConfig = formatSiteConfig(result.rows[0]);
-      await setCached(cacheKey, siteConfig, 300);
+      // НЕ КЕШИРУЕМ - клиент сам управляет кешем
+      // await setCached(cacheKey, siteConfig, 300);
       return siteConfig;
     },
 
