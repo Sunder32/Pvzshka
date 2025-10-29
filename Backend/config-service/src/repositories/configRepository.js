@@ -2,68 +2,41 @@ import { getDatabase } from '../config/database.js'
 import { logger } from '../utils/logger.js'
 
 /**
- * Получить конфигурацию магазина из базы данных
- * @param {string} tenantId - ID магазина или subdomain
+ * Получить конфигурацию сайта из базы данных
+ * @param {number} siteId - ID сайта
  * @returns {Promise<Object|null>} - Конфиг или null
  */
-export async function getConfigFromDB(tenantId) {
+export async function getConfigFromDB(siteId) {
   try {
     const db = getDatabase()
     
-    // Проверяем, является ли tenantId UUID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)
-    
-    const query = isUUID ? `
+    const query = `
       SELECT 
-        tc.id,
-        tc.tenant_id,
-        t.subdomain,
-        t.name as tenant_name,
-        t.status,
-        t.tier,
-        tc.version,
-        tc.branding,
-        tc.layout,
-        tc.features,
-        tc.homepage,
-        tc.seo,
-        tc.integrations,
-        tc.locale,
-        tc.contact_info,
-        tc.is_active,
-        tc.created_at,
-        tc.updated_at
-      FROM tenant_configs tc
-      JOIN tenants t ON t.id = tc.tenant_id
-      WHERE tc.tenant_id = $1::uuid
-      LIMIT 1
-    ` : `
-      SELECT 
-        tc.id,
-        tc.tenant_id,
-        t.subdomain,
-        t.name as tenant_name,
-        t.status,
-        t.tier,
-        tc.version,
-        tc.branding,
-        tc.layout,
-        tc.features,
-        tc.homepage,
-        tc.seo,
-        tc.integrations,
-        tc.locale,
-        tc.contact_info,
-        tc.is_active,
-        tc.created_at,
-        tc.updated_at
-      FROM tenant_configs tc
-      JOIN tenants t ON t.id = tc.tenant_id
-      WHERE t.subdomain = $1
+        sc.id,
+        sc.site_id,
+        s.site_name,
+        s.domain,
+        s.category,
+        s.is_enabled,
+        sc.version,
+        sc.branding,
+        sc.layout,
+        sc.features,
+        sc.homepage,
+        sc.seo,
+        sc.integrations,
+        sc.locale,
+        sc.contact_info,
+        sc.is_active,
+        sc.created_at,
+        sc.updated_at
+      FROM site_configs sc
+      JOIN sites s ON s.id = sc.site_id
+      WHERE sc.site_id = $1
       LIMIT 1
     `
     
-    const result = await db.query(query, [tenantId])
+    const result = await db.query(query, [siteId])
     
     if (result.rows.length === 0) {
       return null
@@ -71,11 +44,11 @@ export async function getConfigFromDB(tenantId) {
     
     const row = result.rows[0]
     return {
-      tenantId: row.tenant_id,
-      subdomain: row.subdomain,
-      name: row.tenant_name,
-      status: row.status,
-      tier: row.tier,
+      siteId: row.site_id,
+      siteName: row.site_name,
+      domain: row.domain,
+      category: row.category,
+      isEnabled: row.is_enabled,
       version: row.version,
       branding: row.branding,
       layout: row.layout,
@@ -90,41 +63,33 @@ export async function getConfigFromDB(tenantId) {
       updatedAt: row.updated_at,
     }
   } catch (error) {
-    logger.error(`Error fetching config from DB for tenant ${tenantId}:`, error)
+    logger.error(`Error fetching config from DB for site ${siteId}:`, error)
     throw error
   }
 }
 
 /**
- * Сохранить конфигурацию магазина в базу данных
- * @param {string} tenantId - ID магазина или subdomain
+ * Сохранить конфигурацию сайта в базу данных
+ * @param {number} siteId - ID сайта
  * @param {Object} config - Конфигурация
  * @returns {Promise<Object>} - Обновленный конфиг
  */
-export async function saveConfigToDB(tenantId, config) {
+export async function saveConfigToDB(siteId, config) {
   try {
     const db = getDatabase()
     
-    // Проверяем, является ли tenantId UUID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)
+    // Проверяем, существует ли сайт
+    const siteQuery = `SELECT id FROM sites WHERE id = $1 LIMIT 1`
+    const siteResult = await db.query(siteQuery, [siteId])
     
-    // Сначала найдем tenant_id
-    const tenantQuery = isUUID
-      ? `SELECT id FROM tenants WHERE id = $1::uuid LIMIT 1`
-      : `SELECT id FROM tenants WHERE subdomain = $1 LIMIT 1`
-    
-    const tenantResult = await db.query(tenantQuery, [tenantId])
-    
-    if (tenantResult.rows.length === 0) {
-      throw new Error(`Tenant ${tenantId} not found`)
+    if (siteResult.rows.length === 0) {
+      throw new Error(`Site ${siteId} not found`)
     }
-    
-    const actualTenantId = tenantResult.rows[0].id
     
     // Обновляем или создаем конфиг
     const query = `
-      INSERT INTO tenant_configs (
-        tenant_id, 
+      INSERT INTO site_configs (
+        site_id, 
         branding, 
         layout, 
         features, 
@@ -135,21 +100,21 @@ export async function saveConfigToDB(tenantId, config) {
         contact_info
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      ON CONFLICT (tenant_id) DO UPDATE SET
-        branding = COALESCE($2, tenant_configs.branding),
-        layout = COALESCE($3, tenant_configs.layout),
-        features = COALESCE($4, tenant_configs.features),
-        homepage = COALESCE($5, tenant_configs.homepage),
-        seo = COALESCE($6, tenant_configs.seo),
-        integrations = COALESCE($7, tenant_configs.integrations),
-        locale = COALESCE($8, tenant_configs.locale),
-        contact_info = COALESCE($9, tenant_configs.contact_info),
+      ON CONFLICT (site_id) DO UPDATE SET
+        branding = COALESCE($2, site_configs.branding),
+        layout = COALESCE($3, site_configs.layout),
+        features = COALESCE($4, site_configs.features),
+        homepage = COALESCE($5, site_configs.homepage),
+        seo = COALESCE($6, site_configs.seo),
+        integrations = COALESCE($7, site_configs.integrations),
+        locale = COALESCE($8, site_configs.locale),
+        contact_info = COALESCE($9, site_configs.contact_info),
         updated_at = NOW()
       RETURNING *
     `
     
     const result = await db.query(query, [
-      actualTenantId,
+      siteId,
       config.branding ? JSON.stringify(config.branding) : null,
       config.layout ? JSON.stringify(config.layout) : null,
       config.features ? JSON.stringify(config.features) : null,
@@ -161,12 +126,12 @@ export async function saveConfigToDB(tenantId, config) {
     ])
     
     if (result.rows.length === 0) {
-      throw new Error(`Failed to save config for tenant ${tenantId}`)
+      throw new Error(`Failed to save config for site ${siteId}`)
     }
 
     const row = result.rows[0]
     return {
-      tenantId: row.tenant_id,
+      siteId: row.site_id,
       version: row.version,
       branding: row.branding,
       layout: row.layout,
@@ -179,7 +144,7 @@ export async function saveConfigToDB(tenantId, config) {
       updatedAt: row.updated_at,
     }
   } catch (error) {
-    logger.error(`Error saving config to DB for tenant ${tenantId}:`, error)
+    logger.error(`Error saving config to DB for site ${siteId}:`, error)
     throw error
   }
 }

@@ -43,6 +43,11 @@ export default function Layout({ children }: LayoutProps) {
       label: 'Тенанты',
     },
     {
+      key: '/site-requests',
+      icon: <AppstoreAddOutlined />,
+      label: 'Заявки на сайты',
+    },
+    {
       key: '/site-builder',
       icon: <BuildOutlined />,
       label: 'Конструктор сайта',

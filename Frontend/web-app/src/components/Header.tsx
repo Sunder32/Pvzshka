@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, X, User, Search, ShoppingBag, Heart, MapPin } from 'lucide-react'
 import Cart from './Cart'
+import SmartSearch from './search/SmartSearch'
 import { useAuthStore } from '@/store/auth'
 import { useCartStore } from '@/store/cart'
 
@@ -60,33 +61,7 @@ export default function Header() {
 
           {/* Search Bar */}
           <div className="hidden lg:flex flex-1 max-w-2xl mx-8">
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Поиск товаров, брендов, категорий..."
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
-                onFocus={() => setIsSearchOpen(true)}
-                onBlur={() => setTimeout(() => setIsSearchOpen(false), 200)}
-              />
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              {isSearchOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border-2 border-gray-100 p-4 max-h-96 overflow-y-auto">
-                  <div className="text-sm font-semibold text-gray-500 mb-3">Популярные запросы</div>
-                  <div className="space-y-2">
-                    {['iPhone 15', 'AirPods Pro', 'MacBook', 'Nike Air Max', 'PlayStation 5'].map(query => (
-                      <Link
-                        key={query}
-                        href={`/catalog?search=${query}`}
-                        className="block px-3 py-2 hover:bg-gray-50 rounded-lg transition-colors"
-                      >
-                        <Search className="w-4 h-4 inline mr-2 text-gray-400" />
-                        {query}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <SmartSearch />
           </div>
 
           {/* Actions */}

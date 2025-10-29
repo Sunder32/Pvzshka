@@ -27,8 +27,8 @@ public class Order {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @Column(name = "customer_id")
+    private UUID customerId;
 
     @Column(name = "order_number", unique = true, nullable = false)
     private String orderNumber;
@@ -37,6 +37,15 @@ public class Order {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status")
+    private PaymentStatus paymentStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_status")
+    private FulfillmentStatus fulfillmentStatus;
+
+    // Pricing
     @Column(name = "subtotal", nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
@@ -49,30 +58,41 @@ public class Order {
     @Column(name = "discount", precision = 10, scale = 2)
     private BigDecimal discount;
 
-    @Column(name = "total", nullable = false, precision = 10, scale = 2)
-    private BigDecimal total;
+    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalAmount;
 
-    @Column(name = "currency", length = 3)
-    private String currency = "RUB";
+    // Delivery
+    @Column(name = "delivery_type", length = 50)
+    private String deliveryType;
 
-    @Column(name = "payment_method")
-    private String paymentMethod;
+    @Column(name = "delivery_address", columnDefinition = "jsonb")
+    private String deliveryAddress;
 
-    @Column(name = "payment_status")
-    @Enumerated(EnumType.STRING)
-    private PaymentStatus paymentStatus;
+    @Column(name = "pvz_id")
+    private UUID pvzId;
 
-    @Column(name = "shipping_address", columnDefinition = "jsonb")
-    private String shippingAddress;
+    @Column(name = "tracking_number", length = 100)
+    private String trackingNumber;
 
-    @Column(name = "billing_address", columnDefinition = "jsonb")
-    private String billingAddress;
+    // Customer info
+    @Column(name = "customer_email", length = 255)
+    private String customerEmail;
 
-    @Column(name = "notes", columnDefinition = "text")
-    private String notes;
+    @Column(name = "customer_phone", length = 20)
+    private String customerPhone;
 
+    @Column(name = "customer_note", columnDefinition = "text")
+    private String customerNote;
+
+    // Metadata
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "cancelled_reason", columnDefinition = "text")
+    private String cancelledReason;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<OrderItem> items = new ArrayList<>();
@@ -88,6 +108,7 @@ public class Order {
     public enum OrderStatus {
         PENDING,
         CONFIRMED,
+        PAID,
         PROCESSING,
         SHIPPED,
         DELIVERED,
@@ -98,10 +119,15 @@ public class Order {
     public enum PaymentStatus {
         PENDING,
         AUTHORIZED,
-        CAPTURED,
+        PAID,
         FAILED,
-        REFUNDED,
-        PARTIALLY_REFUNDED
+        REFUNDED
+    }
+
+    public enum FulfillmentStatus {
+        UNFULFILLED,
+        PARTIALLY_FULFILLED,
+        FULFILLED
     }
 
     public void addItem(OrderItem item) {
@@ -116,10 +142,10 @@ public class Order {
 
     public void calculateTotal() {
         this.subtotal = items.stream()
-                .map(OrderItem::getSubtotal)
+                .map(OrderItem::getTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        this.total = subtotal
+        this.totalAmount = subtotal
                 .add(shippingCost != null ? shippingCost : BigDecimal.ZERO)
                 .add(tax != null ? tax : BigDecimal.ZERO)
                 .subtract(discount != null ? discount : BigDecimal.ZERO);

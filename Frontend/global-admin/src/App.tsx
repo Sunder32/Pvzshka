@@ -9,6 +9,7 @@ import Users from './pages/Users'
 import Billing from './pages/Billing'
 import AppGenerator from './pages/AppGenerator'
 import SiteBuilder from './pages/SiteBuilder'
+import SiteRequests from './pages/SiteRequests'
 import SupportTickets from './pages/SupportTickets'
 import Settings from './pages/Settings'
 import { useAuthStore } from './store/auth'
@@ -34,6 +35,7 @@ function App() {
           <Route path="/tenants" element={<Tenants />} />
           <Route path="/tenants/:id" element={<TenantDetail />} />
           <Route path="/site-builder" element={<SiteBuilder />} />
+          <Route path="/site-requests" element={<SiteRequests />} />
           <Route path="/support" element={<SupportTickets />} />
           <Route path="/users" element={<Users />} />
           <Route path="/billing" element={<Billing />} />

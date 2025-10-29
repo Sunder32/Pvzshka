@@ -9,7 +9,14 @@ ENV NEXT_PUBLIC_GRAPHQL_URL=$NEXT_PUBLIC_GRAPHQL_URL
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci
+
+# Install dependencies with retry logic
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm install --legacy-peer-deps --prefer-offline || \
+    (sleep 5 && npm install --legacy-peer-deps --prefer-offline) || \
+    (sleep 10 && npm install --legacy-peer-deps --prefer-offline)
 
 # Copy source code
 COPY . .

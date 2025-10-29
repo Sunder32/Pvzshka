@@ -37,49 +37,6 @@ const nextConfig = {
   swcMinify: true,
   output: 'standalone',
   
-  // Content Security Policy
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://mc.yandex.ru chrome-extension:",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: https: http:",
-              "connect-src 'self' http://localhost:4000 http://localhost:8080 ws://localhost:* https://www.google-analytics.com https://mc.yandex.ru",
-              "frame-src 'self'",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'self'",
-            ].join('; ')
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin'
-          }
-        ]
-      }
-    ]
-  },
-  
   // Multi-tenant support через поддомены
   async rewrites() {
     return [
@@ -107,7 +64,8 @@ const nextConfig = {
     domains: [
       'cdn.marketplace.com',
       's3.amazonaws.com',
-      'storage.yandexcloud.net'
+      'storage.yandexcloud.net',
+      'localhost'
     ],
     formats: ['image/avif', 'image/webp']
   },
@@ -118,31 +76,47 @@ const nextConfig = {
     defaultLocale: 'ru'
   },
   
-  // Headers
+  // Headers with CSP
   async headers() {
     return [
       {
         source: '/:path*',
         headers: [
           {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://mc.yandex.ru http://localhost:* chrome-extension://*",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https: http:",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https://api.marketplace.com http://localhost:* ws://localhost:* wss://localhost:*",
+              "frame-src 'self' https://www.youtube.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'"
+            ].join('; ')
+          },
+          {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
           },
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
           },
           {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
             key: 'X-XSS-Protection',
             value: '1; mode=block'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
           }
         ]
       }

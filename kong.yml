@@ -1,6 +1,14 @@
 _format_version: "3.0"
 
 services:
+  - name: web-app
+    url: http://web-app:3000
+    routes:
+      - name: web-app-route
+        paths:
+          - /
+        strip_path: false
+        
   - name: config-service
     url: http://config-service:4001
     routes:
@@ -52,32 +60,33 @@ services:
         strip_path: false
 
 plugins:
-  - name: rate-limiting
-    config:
-      minute: 100
-      hour: 1000
-      policy: local
-
   - name: cors
     config:
       origins:
         - http://localhost:3000
         - http://localhost:3001
         - http://localhost:3002
+        - http://localhost:3003
+        - http://localhost:8000
       methods:
         - GET
         - POST
         - PUT
         - DELETE
         - OPTIONS
+        - PATCH
       headers:
         - Accept
         - Authorization
         - Content-Type
+        - X-Tenant-ID
+        - X-User-ID
       credentials: true
+      exposed_headers:
+        - X-Total-Count
 
-  - name: jwt
+  - name: rate-limiting
     config:
-      claims_to_verify:
-        - exp
-      key_claim_name: kid
+      minute: 1000
+      hour: 10000
+      policy: local

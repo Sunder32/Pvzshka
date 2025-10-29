@@ -9,6 +9,9 @@ export interface CartItem {
   quantity: number
   image?: string
   variant?: string
+  size?: string
+  color?: string
+  variantId?: string
 }
 
 interface CartStore {

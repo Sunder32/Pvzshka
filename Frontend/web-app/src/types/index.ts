@@ -4,6 +4,7 @@ export interface Product {
   description: string
   price: number
   oldPrice?: number
+  compareAtPrice?: number  // Для показа старой цены
   discount?: number
   images: string[]
   category: string
@@ -18,6 +19,24 @@ export interface Product {
   tenant_id?: string
   created_at?: string
   updated_at?: string
+  // Новые поля для Quick View
+  availableSizes?: string[]
+  availableColors?: Array<{ id: string; name: string; hex: string }>
+  tags?: string[]  // ["Топ продаж", "Новинка", "Эксклюзив"]
+  isFeatured?: boolean
+  isNew?: boolean
+  isLimitedOffer?: boolean
+  variants?: ProductVariant[]
+}
+
+export interface ProductVariant {
+  id: string
+  sku: string
+  size?: string
+  color?: string
+  price: number
+  stock: number
+  images?: string[]
 }
 
 export interface Category {
@@ -38,6 +57,10 @@ export interface CartItem {
   quantity: number
   image: string
   attributes?: Record<string, any>
+  // Новые поля для вариантов
+  size?: string
+  color?: string
+  variantId?: string
 }
 
 export interface User {

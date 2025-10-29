@@ -1,11 +1,28 @@
-import { ApolloClient, InMemoryCache, HttpLink, gql } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, gql, from } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 
 const httpLink = new HttpLink({
   uri: 'http://localhost:4000/graphql',
 });
 
+const authLink = setContext((_, { headers }) => {
+  // Get token from localStorage
+  const authData = localStorage.getItem('auth-storage');
+  const token = authData ? JSON.parse(authData).state?.token : null;
+  const user = authData ? JSON.parse(authData).state?.user : null;
+
+  return {
+    headers: {
+      ...headers,
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(user?.id && { 'x-user-id': user.id }),
+      ...(user?.role && { 'x-user-role': user.role }),
+    }
+  };
+});
+
 const client = new ApolloClient({
-  link: httpLink,
+  link: from([authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {

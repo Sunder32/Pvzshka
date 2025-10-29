@@ -13,6 +13,8 @@ import Settings from './pages/Settings'
 import Suppliers from './pages/Suppliers'
 import Reports from './pages/Reports'
 import SiteSettings from './pages/SiteSettings'
+import SiteRequestWizard from './pages/SiteRequestWizard'
+import MySites from './pages/MySites'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore()
@@ -33,11 +35,14 @@ export default function App() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="my-sites" element={<MySites />} />
+          <Route path="site-request" element={<SiteRequestWizard />} />
           <Route path="products" element={<Products />} />
           <Route path="orders" element={<Orders />} />
           <Route path="customers" element={<Customers />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="site-builder" element={<SiteBuilder />} />
+          <Route path="site-builder/:siteId" element={<SiteBuilder />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="reports" element={<Reports />} />
           <Route path="site-settings" element={<SiteSettings />} />
