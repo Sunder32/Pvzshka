@@ -4,8 +4,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -19,27 +21,24 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @Column(name = "product_id", nullable = false)
+    @Column(name = "product_id")
     private UUID productId;
 
     @Column(name = "vendor_id")
     private UUID vendorId;
 
-    @Column(name = "product_name", nullable = false)
-    private String productName;
+    @Column(name = "title", nullable = false, length = 500)
+    private String title;
 
-    @Column(name = "sku")
+    @Column(name = "sku", length = 100)
     private String sku;
-
-    @Column(name = "variant_id")
-    private UUID variantId;
-
-    @Column(name = "variant_name")
-    private String variantName;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
@@ -47,30 +46,25 @@ public class OrderItem {
     @Column(name = "price", nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "discount", precision = 10, scale = 2)
-    private BigDecimal discount;
+    @Column(name = "total", nullable = false, precision = 10, scale = 2)
+    private BigDecimal total;
 
-    @Column(name = "tax", precision = 10, scale = 2)
-    private BigDecimal tax;
+    @Column(name = "vendor_payout", precision = 10, scale = 2)
+    private BigDecimal vendorPayout;
 
-    @Column(name = "subtotal", precision = 10, scale = 2)
-    private BigDecimal subtotal;
-
-    @Column(name = "image_url")
-    private String imageUrl;
+    @Column(name = "platform_fee", precision = 10, scale = 2)
+    private BigDecimal platformFee;
 
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     @PrePersist
     @PreUpdate
-    public void calculateSubtotal() {
-        BigDecimal baseAmount = price.multiply(new BigDecimal(quantity));
-        BigDecimal discountAmount = discount != null ? discount : BigDecimal.ZERO;
-        BigDecimal taxAmount = tax != null ? tax : BigDecimal.ZERO;
-
-        this.subtotal = baseAmount
-                .subtract(discountAmount)
-                .add(taxAmount);
+    public void calculateTotal() {
+        this.total = price.multiply(new BigDecimal(quantity));
     }
 }

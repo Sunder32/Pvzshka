@@ -89,16 +89,16 @@ const defaultConfig = {
   updatedAt: new Date().toISOString(),
 }
 
-// GET /api/config/:tenantId - Получить конфиг магазина
-router.get('/:tenantId', async (req, res) => {
+// GET /api/config/:siteId - Получить конфиг сайта
+router.get('/:siteId', async (req, res) => {
   try {
-    const { tenantId } = req.params
+    const { siteId } = req.params
     const redis = getRedis()
 
     // Пытаемся получить из Redis
-    const cached = await redis.get(`config:${tenantId}`)
+    const cached = await redis.get(`config:site:${siteId}`)
     if (cached) {
-      logger.info(`Config cache hit for tenant: ${tenantId}`)
+      logger.info(`Config cache hit for site: ${siteId}`)
       return res.json({
         success: true,
         data: JSON.parse(cached),
@@ -107,34 +107,60 @@ router.get('/:tenantId', async (req, res) => {
     }
 
     // Получаем из PostgreSQL
-    const dbData = await getConfigFromDB(tenantId)
+    const dbData = await getConfigFromDB(parseInt(siteId))
     
     if (!dbData) {
       return res.status(404).json({
         success: false,
-        error: 'Tenant not found',
+        error: 'Site not found',
       })
     }
 
     // Формируем полный конфиг, мержим с дефолтным
     const config = {
       ...defaultConfig,
-      ...dbData.config,
-      tenantId: dbData.tenantId,
-      subdomain: dbData.subdomain,
+      siteId: dbData.siteId,
+      siteName: dbData.siteName,
+      domain: dbData.domain,
+      category: dbData.category,
+      isEnabled: dbData.isEnabled,
       branding: {
         ...defaultConfig.branding,
-        ...(dbData.config?.branding || {}),
-        name: dbData.name,
+        ...(dbData.branding || {}),
+        name: dbData.siteName,
       },
-      status: dbData.status,
-      tier: dbData.tier,
+      layout: {
+        ...defaultConfig.layout,
+        ...(dbData.layout || {}),
+      },
+      features: {
+        ...defaultConfig.features,
+        ...(dbData.features || {}),
+      },
+      homepage: {
+        ...defaultConfig.homepage,
+        ...(dbData.homepage || {}),
+      },
+      seo: {
+        ...defaultConfig.seo,
+        ...(dbData.seo || {}),
+      },
+      integrations: {
+        ...defaultConfig.integrations,
+        ...(dbData.integrations || {}),
+      },
+      locale: {
+        ...defaultConfig.locale,
+        ...(dbData.locale || {}),
+      },
+      contactInfo: dbData.contactInfo,
+      version: dbData.version,
       createdAt: dbData.createdAt,
       updatedAt: dbData.updatedAt,
     }
 
     // Сохраняем в Redis на 1 час
-    await redis.setEx(`config:${tenantId}`, 3600, JSON.stringify(config))
+    await redis.setEx(`config:site:${siteId}`, 3600, JSON.stringify(config))
 
     res.json({
       success: true,
@@ -146,6 +172,92 @@ router.get('/:tenantId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch config',
+      message: error.message,
+    })
+  }
+})
+
+// POST /api/config/:siteId - Сохранить конфиг сайта
+router.post('/:siteId', async (req, res) => {
+  try {
+    const { siteId } = req.params
+    const config = req.body
+    const redis = getRedis()
+
+    // Сохраняем в PostgreSQL
+    const savedConfig = await saveConfigToDB(parseInt(siteId), config)
+
+    // Получаем полные данные сайта
+    const dbData = await getConfigFromDB(parseInt(siteId))
+    
+    if (!dbData) {
+      return res.status(404).json({
+        success: false,
+        error: 'Site not found',
+      })
+    }
+
+    // Формируем полный конфиг
+    const fullConfig = {
+      ...defaultConfig,
+      siteId: dbData.siteId,
+      siteName: dbData.siteName,
+      domain: dbData.domain,
+      category: dbData.category,
+      isEnabled: dbData.isEnabled,
+      branding: {
+        ...defaultConfig.branding,
+        ...(dbData.branding || {}),
+        name: dbData.siteName,
+      },
+      layout: {
+        ...defaultConfig.layout,
+        ...(dbData.layout || {}),
+      },
+      features: {
+        ...defaultConfig.features,
+        ...(dbData.features || {}),
+      },
+      homepage: {
+        ...defaultConfig.homepage,
+        ...(dbData.homepage || {}),
+      },
+      seo: {
+        ...defaultConfig.seo,
+        ...(dbData.seo || {}),
+      },
+      integrations: {
+        ...defaultConfig.integrations,
+        ...(dbData.integrations || {}),
+      },
+      locale: {
+        ...defaultConfig.locale,
+        ...(dbData.locale || {}),
+      },
+      contactInfo: dbData.contactInfo,
+      version: dbData.version,
+      createdAt: dbData.createdAt,
+      updatedAt: dbData.updatedAt,
+    }
+
+    // Обновляем кэш в Redis
+    await redis.setEx(`config:site:${siteId}`, 3600, JSON.stringify(fullConfig))
+
+    // Отправляем уведомление об обновлении конфигурации
+    await notifyConfigUpdate(siteId, fullConfig)
+
+    logger.info(`Config saved for site: ${siteId}`)
+
+    res.json({
+      success: true,
+      data: fullConfig,
+      message: 'Config saved successfully',
+    })
+  } catch (error) {
+    logger.error('Error saving config:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save config',
       message: error.message,
     })
   }

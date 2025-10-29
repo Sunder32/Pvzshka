@@ -45,6 +45,12 @@ export function getDatabase() {
 export const getPool = getDatabase;
 export const initDatabase = connectDatabase;
 
+// Query helper function
+export async function query(text, params) {
+  const db = getDatabase();
+  return await db.query(text, params);
+}
+
 export async function closeDatabase() {
   if (pool) {
     await pool.end();

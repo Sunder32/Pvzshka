@@ -29,16 +29,27 @@ export const resolvers = {
     },
 
     async siteConfigBySubdomain(_, { subdomain }) {
-      const tenantResult = await getPool().query(
-        'SELECT id FROM tenants WHERE subdomain = $1',
+      const cacheKey = `siteConfig:subdomain:${subdomain}`;
+      const cached = await getCached(cacheKey);
+      if (cached) return cached;
+
+      const result = await getPool().query(
+        `SELECT sc.*, s.site_name, s.domain, s.category
+         FROM site_configs sc
+         JOIN sites s ON sc.site_id = s.id
+         WHERE s.domain = $1`,
         [subdomain]
       );
 
-      if (tenantResult.rows.length === 0) {
-        throw new GraphQLError('Tenant not found');
+      if (result.rows.length === 0) {
+        throw new GraphQLError('Site configuration not found', {
+          extensions: { code: 'NOT_FOUND' }
+        });
       }
 
-      return resolvers.Query.siteConfig(_, { tenantId: tenantResult.rows[0].id });
+      const config = formatSiteConfig(result.rows[0]);
+      await setCached(cacheKey, config, 300);
+      return config;
     },
 
     // Tenant Configuration

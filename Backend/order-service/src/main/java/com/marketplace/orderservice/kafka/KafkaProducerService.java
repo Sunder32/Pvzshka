@@ -30,8 +30,8 @@ public class KafkaProducerService {
             event.put("tenant_id", order.getTenantId().toString());
             event.put("order_id", order.getId().toString());
             event.put("order_number", order.getOrderNumber());
-            event.put("user_id", order.getUserId().toString());
-            event.put("total", order.getTotal());
+            event.put("customer_id", order.getCustomerId().toString());
+            event.put("total_amount", order.getTotalAmount());
             event.put("status", order.getStatus().name());
             event.put("timestamp", System.currentTimeMillis());
 

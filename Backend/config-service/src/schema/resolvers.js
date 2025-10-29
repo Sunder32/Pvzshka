@@ -62,9 +62,10 @@ export const resolvers = {
       if (cached) return cached;
 
       const result = await getPool().query(
-        `SELECT sc.* FROM site_configs sc
-         JOIN tenants t ON sc.tenant_id = t.id
-         WHERE t.subdomain = $1`,
+        `SELECT sc.*, s.site_name, s.domain, s.category
+         FROM site_configs sc
+         JOIN sites s ON sc.site_id = s.id
+         WHERE s.domain = $1`,
         [subdomain]
       );
 

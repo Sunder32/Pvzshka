@@ -40,20 +40,19 @@ public class OrderServiceImpl implements OrderService {
         // Create order entity
         Order order = new Order();
         order.setTenantId(tenantId);
-        order.setUserId(userId);
+        order.setCustomerId(userId);
         order.setOrderNumber(orderNumber);
         order.setStatus(Order.OrderStatus.PENDING);
         order.setPaymentStatus(Order.PaymentStatus.PENDING);
-        order.setPaymentMethod(request.getPaymentMethod());
+        order.setFulfillmentStatus(Order.FulfillmentStatus.UNFULFILLED);
         order.setShippingCost(BigDecimal.ZERO);
         order.setTax(BigDecimal.ZERO);
         order.setDiscount(BigDecimal.ZERO);
-        order.setNotes(request.getNotes());
+        order.setCustomerNote(request.getNotes());
 
         // Convert addresses to JSON
         try {
-            order.setShippingAddress(objectMapper.writeValueAsString(request.getShippingAddress()));
-            order.setBillingAddress(objectMapper.writeValueAsString(request.getBillingAddress()));
+            order.setDeliveryAddress(objectMapper.writeValueAsString(request.getShippingAddress()));
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize addresses", e);
         }
@@ -61,16 +60,13 @@ public class OrderServiceImpl implements OrderService {
         // Add order items
         for (CreateOrderRequest.OrderItemRequest itemRequest : request.getItems()) {
             OrderItem item = new OrderItem();
+            item.setTenantId(tenantId);
             item.setProductId(itemRequest.getProductId());
             item.setVendorId(itemRequest.getVendorId());
-            item.setProductName(itemRequest.getProductName());
+            item.setTitle(itemRequest.getProductName());
             item.setSku(itemRequest.getSku());
-            item.setVariantId(itemRequest.getVariantId());
-            item.setVariantName(itemRequest.getVariantName());
             item.setQuantity(itemRequest.getQuantity());
             item.setPrice(itemRequest.getPrice());
-            item.setDiscount(itemRequest.getDiscount());
-            item.setImageUrl(itemRequest.getImageUrl());
             order.addItem(item);
         }
 
@@ -107,7 +103,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByUser(UUID tenantId, UUID userId) {
-        return orderRepository.findByTenantIdAndUserIdOrderByCreatedAtDesc(tenantId, userId)
+        return orderRepository.findByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenantId, userId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -159,8 +155,9 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Cannot cancel order in current status");
         }
 
-        Order.OrderStatus oldStatus = order.getStatus();
         order.setStatus(Order.OrderStatus.CANCELLED);
+        order.setCancelledAt(LocalDateTime.now());
+        order.setCancelledReason(reason);
 
         Order updatedOrder = orderRepository.save(order);
 
@@ -176,8 +173,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByIdAndTenantId(orderId, tenantId)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        order.setPaymentStatus(Order.PaymentStatus.CAPTURED);
-        order.setStatus(Order.OrderStatus.CONFIRMED);
+        order.setPaymentStatus(Order.PaymentStatus.PAID);
+        order.setStatus(Order.OrderStatus.PAID);
 
         orderRepository.save(order);
 
@@ -223,20 +220,17 @@ public class OrderServiceImpl implements OrderService {
         OrderResponse response = new OrderResponse();
         response.setId(order.getId());
         response.setTenantId(order.getTenantId());
-        response.setUserId(order.getUserId());
+        response.setUserId(order.getCustomerId());
         response.setOrderNumber(order.getOrderNumber());
         response.setStatus(order.getStatus());
         response.setSubtotal(order.getSubtotal());
         response.setShippingCost(order.getShippingCost());
         response.setTax(order.getTax());
         response.setDiscount(order.getDiscount());
-        response.setTotal(order.getTotal());
-        response.setCurrency(order.getCurrency());
-        response.setPaymentMethod(order.getPaymentMethod());
+        response.setTotal(order.getTotalAmount());
         response.setPaymentStatus(order.getPaymentStatus());
-        response.setShippingAddress(order.getShippingAddress());
-        response.setBillingAddress(order.getBillingAddress());
-        response.setNotes(order.getNotes());
+        response.setShippingAddress(order.getDeliveryAddress());
+        response.setNotes(order.getCustomerNote());
         response.setCreatedAt(order.getCreatedAt());
         response.setUpdatedAt(order.getUpdatedAt());
 
@@ -254,16 +248,11 @@ public class OrderServiceImpl implements OrderService {
         response.setId(item.getId());
         response.setProductId(item.getProductId());
         response.setVendorId(item.getVendorId());
-        response.setProductName(item.getProductName());
+        response.setProductName(item.getTitle());
         response.setSku(item.getSku());
-        response.setVariantId(item.getVariantId());
-        response.setVariantName(item.getVariantName());
         response.setQuantity(item.getQuantity());
         response.setPrice(item.getPrice());
-        response.setDiscount(item.getDiscount());
-        response.setTax(item.getTax());
-        response.setSubtotal(item.getSubtotal());
-        response.setImageUrl(item.getImageUrl());
+        response.setSubtotal(item.getTotal());
         return response;
     }
 }

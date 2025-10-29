@@ -1,16 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Card, Tabs, Button, Space, message, Spin, Select, Alert } from 'antd';
 import { SaveOutlined, EyeOutlined, UndoOutlined, CloudUploadOutlined } from '@ant-design/icons';
-import { useMutation, useQuery } from '@apollo/client';
 import ThemeEditor from '../components/builder/ThemeEditor';
 import LayoutBuilder from '../components/builder/LayoutBuilder';
 import ComponentLibrary from '../components/builder/ComponentLibrary';
 import PreviewFrame from '../components/builder/PreviewFrame';
-import {
-  GET_SITE_CONFIG,
-  SAVE_SITE_CONFIG,
-  PUBLISH_SITE_CONFIG,
-} from '../lib/graphql';
 
 const { Content, Sider } = Layout;
 const { TabPane } = Tabs;
@@ -41,68 +35,115 @@ interface Section {
 }
 
 export default function SiteBuilder() {
-  const [selectedTenantId, setSelectedTenantId] = useState<string>('');
-  const [tenants, setTenants] = useState<any[]>([]);
-  const [loadingTenants, setLoadingTenants] = useState(true);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const [sites, setSites] = useState<any[]>([]);
+  const [loadingSites, setLoadingSites] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  // Load available tenants
+  // Load available sites
   useEffect(() => {
-    const fetchTenants = async () => {
+    const fetchSites = async () => {
       try {
-        const token = localStorage.getItem('admin_token');
-        if (!token) {
+        const authData = localStorage.getItem('auth-storage');
+        if (!authData) {
           message.warning('Необходима авторизация');
-          setLoadingTenants(false);
+          setLoadingSites(false);
           return;
         }
 
-        const response = await fetch('http://localhost:4000/api/tenants', {
+        const { state } = JSON.parse(authData);
+        const token = state?.token;
+        const userData = state?.user;
+
+        if (!token || !userData) {
+          message.warning('Необходима авторизация');
+          setLoadingSites(false);
+          return;
+        }
+
+        setUser(userData); // Save user to state
+
+        const response = await fetch('http://localhost:4000/graphql', {
+          method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
+            'x-user-id': userData.id,
+            'x-user-role': userData.role,
           },
+          body: JSON.stringify({
+            query: `
+              query AllSites {
+                allSites {
+                  id
+                  siteName
+                  domain
+                  category
+                  isEnabled
+                  userId
+                  user {
+                    email
+                    firstName
+                  }
+                }
+              }
+            `,
+          }),
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('📋 API Response:', result);
-        const tenantsData = result.data || result.tenants || [];
-        console.log('📋 Loaded tenants:', tenantsData);
-        setTenants(tenantsData);
-        if (tenantsData.length > 0) {
-          console.log('✅ Selected first tenant ID:', tenantsData[0].id);
-          setSelectedTenantId(tenantsData[0].id);
+        const { data } = await response.json();
+        console.log('📋 Loaded sites:', data?.allSites);
+        const sitesData = data?.allSites || [];
+        setSites(sitesData);
+        if (sitesData.length > 0) {
+          console.log('✅ Selected first site ID:', sitesData[0].id);
+          setSelectedSiteId(sitesData[0].id);
         }
       } catch (error) {
-        console.error('Error loading tenants:', error);
+        console.error('Error loading sites:', error);
         message.error('Ошибка загрузки списка сайтов: ' + (error as Error).message);
       } finally {
-        setLoadingTenants(false);
+        setLoadingSites(false);
       }
     };
-    fetchTenants();
+    fetchSites();
   }, []);
 
-  // Load site config
-  const { data, loading, refetch } = useQuery(GET_SITE_CONFIG, {
-    variables: { tenantId: selectedTenantId },
-    skip: !selectedTenantId,
-  });
+  // Load site config via REST API
+  const [loadingConfig, setLoadingConfig] = useState(false);
+  const [configData, setConfigData] = useState<any>(null);
 
-  // Сбрасываем состояние при смене тенанта
+  const refetch = async () => {
+    if (!selectedSiteId) return;
+    
+    setLoadingConfig(true);
+    try {
+      const response = await fetch(`http://localhost:4000/api/config/${selectedSiteId}`);
+      if (response.ok) {
+        const result = await response.json();
+        setConfigData(result.data);
+      } else if (response.status === 404) {
+        // No config exists yet, use default
+        setConfigData(null);
+      }
+    } catch (error) {
+      console.error('Error loading config:', error);
+    } finally {
+      setLoadingConfig(false);
+    }
+  };
+
+  // Load config when site changes
   useEffect(() => {
-    if (selectedTenantId) {
-      console.log('🔄 Tenant changed to:', selectedTenantId);
+    if (selectedSiteId) {
+      console.log('🔄 Site changed to:', selectedSiteId);
       setHasChanges(false);
       setSelectedSection(null);
+      refetch();
     }
-  }, [selectedTenantId]);
-
-  // Mutations
-  const [saveSiteConfig, { loading: saving }] = useMutation(SAVE_SITE_CONFIG);
-  const [publishSiteConfig, { loading: publishing }] = useMutation(PUBLISH_SITE_CONFIG);
+  }, [selectedSiteId]);
 
   const [config, setConfig] = useState<SiteConfig>({
     theme: {
@@ -125,19 +166,21 @@ export default function SiteBuilder() {
   const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Load config from GraphQL
+  // Load config from REST API
   useEffect(() => {
-    if (data?.siteConfig) {
-      console.log('📥 Loading config from server for tenant:', selectedTenantId);
-      console.log('📥 Raw data from server:', JSON.stringify(data.siteConfig, null, 2));
-      console.log('📥 Sections count from server:', data.siteConfig.layout?.sections?.length || 0);
+    if (configData) {
+      console.log('📥 Loading config from server for site:', selectedSiteId);
+      console.log('📥 Raw data from server:', JSON.stringify(configData, null, 2));
+      
+      const sections = configData.layout?.sections || [];
+      console.log('📥 Sections count from server:', sections.length);
       
       let needsMigration = false;
       
-      const validSections = (data.siteConfig.layout?.sections || [])
+      const validSections = sections
         .filter((s: any) => s && s.id && s.type)
         .map((s: any) => {
-          // Проверяем, пустой ли config (нет ключей или сам объект undefined/null)
+          // Проверяем, пустой ли config
           const configIsEmpty = !s.config || Object.keys(s.config).length === 0;
           
           if (configIsEmpty) {
@@ -163,17 +206,16 @@ export default function SiteBuilder() {
         });
 
       console.log('✅ Valid sections loaded:', validSections.length, validSections.map((s: any) => `${s.type}(${s.id})`));
-      console.log('✅ Full sections data:', JSON.stringify(validSections, null, 2));
 
       setConfig({
-        theme: data.siteConfig.theme || {
-          primaryColor: '#0066cc',
-          secondaryColor: '#6c757d',
-          fontFamily: 'Inter',
-          borderRadius: 8,
+        theme: {
+          primaryColor: configData.branding?.primaryColor || '#0066cc',
+          secondaryColor: configData.branding?.secondaryColor || '#6c757d',
+          fontFamily: configData.branding?.fontFamily || 'Inter',
+          borderRadius: configData.layout?.borderRadius || 8,
         },
         logo: {
-          url: data.siteConfig.logo || '/logo.png',
+          url: configData.branding?.logo || '/logo.png',
           width: 150,
           height: 40,
         },
@@ -182,7 +224,6 @@ export default function SiteBuilder() {
         },
       });
       
-      // Если была миграция, автоматически сохраняем
       if (needsMigration) {
         console.log('💾 Auto-saving migrated data...');
         setHasChanges(true);
@@ -191,7 +232,7 @@ export default function SiteBuilder() {
         setHasChanges(false);
       }
     }
-  }, [data, selectedTenantId]);
+  }, [configData, selectedSiteId]);
 
   const handleThemeChange = (themeUpdates: Partial<SiteConfig['theme']>) => {
     setConfig((prev) => ({
@@ -322,6 +363,12 @@ export default function SiteBuilder() {
   };
 
   const handleSave = async () => {
+    if (!selectedSiteId) {
+      message.error('Выберите сайт для сохранения');
+      return;
+    }
+
+    setSaving(true);
     try {
       // Фильтруем только валидные секции перед сохранением
       const validSections = config.layout.sections
@@ -334,42 +381,47 @@ export default function SiteBuilder() {
           config: s.config,
         }));
 
-      console.log('💾 Saving config for tenant:', selectedTenantId);
+      console.log('💾 Saving config for site:', selectedSiteId);
       console.log('💾 Sections to save:', validSections.length, validSections.map(s => `${s.type}(${s.id})`));
       console.log('💾 Full sections data:', JSON.stringify(validSections, null, 2));
 
-      const result = await saveSiteConfig({
-        variables: {
-          tenantId: selectedTenantId,
+      // Use REST API instead of GraphQL
+      const apiConfig = {
+        branding: {
           logo: config.logo.url,
-          theme: {
-            primaryColor: config.theme.primaryColor,
-            secondaryColor: config.theme.secondaryColor,
-            fontFamily: config.theme.fontFamily,
-            borderRadius: config.theme.borderRadius,
-          },
-          layout: {
-            header: {
-              showLogo: true,
-              showSearch: true,
-              showCart: true,
-              menu: [],
-            },
-            footer: {
-              showNewsletter: true,
-              showSocial: true,
-              columns: [],
-            },
-            sections: validSections,
-          },
+          primaryColor: config.theme.primaryColor,
+          secondaryColor: config.theme.secondaryColor,
+          fontFamily: config.theme.fontFamily,
         },
+        layout: {
+          sections: validSections,
+          borderRadius: config.theme.borderRadius,
+        },
+        features: {},
+        homepage: {},
+        seo: {},
+        integrations: {},
+        locale: {},
+      };
+
+      const response = await fetch(`http://localhost:4000/api/config/${selectedSiteId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiConfig),
       });
-      
+
+      if (!response.ok) {
+        throw new Error('Failed to save config');
+      }
+
+      const result = await response.json();
       console.log('✅ Save result:', result);
       message.success('Настройки сохранены!');
       setHasChanges(false);
       
-      // Не вызываем refetch сразу, даём серверу время обработать
+      // Refresh data after save
       setTimeout(() => {
         console.log('🔄 Refetching data...');
         refetch();
@@ -377,24 +429,88 @@ export default function SiteBuilder() {
     } catch (error) {
       message.error('Ошибка при сохранении');
       console.error('❌ Save error:', error);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handlePublish = async () => {
+    if (!selectedSiteId) {
+      message.error('Выберите сайт для публикации');
+      return;
+    }
+
+    setPublishing(true);
     try {
+      // 1. Сохраняем изменения
       await handleSave();
-      await publishSiteConfig({
-        variables: { tenantId: selectedTenantId },
+      
+      if (!user) {
+        throw new Error('Unauthorized - user not found');
+      }
+      
+      // 2. Включаем сайт (toggleSite)
+      const toggleResponse = await fetch('http://localhost:4000/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+          'x-user-role': user.role,
+        },
+        body: JSON.stringify({
+          query: `
+            mutation ToggleSite($id: ID!, $isEnabled: Boolean!) {
+              toggleSite(id: $id, isEnabled: $isEnabled) {
+                id
+                isEnabled
+                siteName
+              }
+            }
+          `,
+          variables: {
+            id: selectedSiteId,
+            isEnabled: true,
+          },
+        }),
       });
-      message.success('Сайт опубликован!');
-      refetch();
+
+      const toggleResult = await toggleResponse.json();
+      
+      if (toggleResult.errors) {
+        throw new Error(toggleResult.errors[0]?.message || 'Failed to publish');
+      }
+
+      // 3. Очистка кэша для этого сайта (инвалидация)
+      const selectedSite = sites.find(s => s.id === selectedSiteId);
+      if (selectedSite) {
+        try {
+          // Очищаем кэш через API endpoint
+          await fetch(`http://localhost:4000/api/config/invalidate/${selectedSiteId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': user.id,
+            },
+          });
+          console.log('✅ Cache invalidated for site:', selectedSiteId);
+        } catch (cacheError) {
+          console.warn('⚠️ Failed to invalidate cache:', cacheError);
+        }
+      }
+
+      message.success(`Сайт "${selectedSite?.siteName}" опубликован! Кэш очищен.`);
+      
+      // 4. Перезагружаем конфигурацию
+      await refetch();
     } catch (error) {
       message.error('Ошибка при публикации');
       console.error(error);
+    } finally {
+      setPublishing(false);
     }
   };
 
-  if (loadingTenants || loading) {
+  if (loadingSites || loadingConfig) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <Spin size="large" tip="Загрузка конфигурации..." />
@@ -402,8 +518,8 @@ export default function SiteBuilder() {
     );
   }
 
-  const selectedTenant = tenants.find(t => t.id === selectedTenantId);
-  const siteUrl = selectedTenant?.custom_domain || `${selectedTenant?.subdomain}.yourplatform.com`;
+  const selectedSite = sites.find((s: any) => s.id === selectedSiteId);
+  const siteUrl = selectedSite?.domain || 'Не указан';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -412,29 +528,42 @@ export default function SiteBuilder() {
         <div style={{ padding: '16px' }}>
           <h2>Конструктор сайта</h2>
           
-          {/* Tenant Selector */}
+          {/* Site Selector */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>
               Выберите сайт:
             </label>
             <Select
               style={{ width: '100%' }}
-              value={selectedTenantId}
-              onChange={(value) => setSelectedTenantId(value)}
-              placeholder="Выберите tenant"
+              value={selectedSiteId}
+              onChange={(value) => setSelectedSiteId(value)}
+              placeholder="Выберите сайт"
             >
-              {tenants.map(tenant => (
-                <Option key={tenant.id} value={tenant.id}>
-                  {tenant.name}
+              {sites.map((site: any) => (
+                <Option key={site.id} value={site.id}>
+                  {site.siteName} ({site.domain})
                 </Option>
               ))}
             </Select>
-            {selectedTenant && (
-              <Alert
-                message={`Адрес сайта: ${siteUrl}`}
-                type="info"
-                style={{ marginTop: '8px', fontSize: '12px' }}
-              />
+            {selectedSite && (
+              <>
+                <Alert
+                  message={`Домен: ${siteUrl} | Владелец: ${selectedSite.user?.email || 'Неизвестен'}`}
+                  type="info"
+                  style={{ marginTop: '8px', fontSize: '12px' }}
+                />
+                <Button
+                  type="primary"
+                  block
+                  style={{ marginTop: '8px' }}
+                  onClick={() => {
+                    const url = `http://localhost:3003?site=${selectedSite.domain}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  🌐 Открыть сайт
+                </Button>
+              </>
             )}
           </div>
 
@@ -644,7 +773,39 @@ function getDefaultConfig(type: string): any {
       buttonText: '',
       buttonLink: '',
     },
+    testimonials: {
+      title: 'Отзывы клиентов',
+      showRating: true,
+      layout: 'carousel',
+      items: [
+        {
+          author: 'Иван Иванов',
+          text: 'Отличный сервис!',
+          rating: 5,
+        },
+      ],
+    },
+    'custom-html': {
+      html: '<div class="custom-section"><p>Пользовательский HTML контент</p></div>',
+      padding: 20,
+      backgroundColor: '#f5f5f5',
+    },
+    newsletter: {
+      title: 'Подпишитесь на рассылку',
+      subtitle: 'Получайте актуальные предложения',
+      placeholder: 'Ваш email',
+      buttonText: 'Подписаться',
+      backgroundColor: '#f8f9fa',
+    },
+    footer: {
+      backgroundColor: '#333333',
+      textColor: '#ffffff',
+      showSocial: true,
+      showNewsletter: true,
+      copyrightText: '© 2025 Все права защищены',
+    },
   };
 
   return defaults[type] || {};
 }
+

@@ -7,8 +7,9 @@ services:
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: postgres
-      KONG_PG_USER: kong
-      KONG_PG_PASSWORD: kong
+      KONG_PG_USER: platform
+      KONG_PG_PASSWORD: platform123
+      KONG_PG_DATABASE: kong
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
@@ -204,7 +205,7 @@ services:
       context: ./Backend/catalog-service
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3004:3000"
     environment:
       - DATABASE_URL=postgresql://platform:platform123@postgres:5432/platform
       - REDIS_URL=redis://redis:6379
@@ -372,7 +373,7 @@ services:
       context: ./Frontend/tenant-admin
       dockerfile: Dockerfile
     ports:
-      - "3002:80"
+      - "3001:80"
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_GRAPHQL_URL=http://localhost:4000/graphql
@@ -388,7 +389,7 @@ services:
       context: ./Frontend/global-admin
       dockerfile: Dockerfile
     ports:
-      - "3001:80"
+      - "3000:80"
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_GRAPHQL_URL=http://localhost:4000/graphql

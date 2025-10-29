@@ -11,10 +11,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.2.6",
     "@chakra-ui/icons": "^2.1.1",
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
+    "antd": "^5.12.8",
     "axios": "^1.6.5",
     "date-fns": "^3.0.6",
     "framer-motion": "^10.18.0",
