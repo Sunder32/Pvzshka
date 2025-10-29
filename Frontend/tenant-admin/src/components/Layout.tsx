@@ -28,6 +28,7 @@ import {
   SettingsIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
+  EditIcon,
 } from '@chakra-ui/icons'
 import { MdDashboard, MdShoppingCart, MdPeople, MdBarChart, MdBuild, MdSupport, MdLocalShipping, MdAssessment, MdStore, MdAddCircle } from 'react-icons/md'
 import { useAuthStore } from '../store/auth'
@@ -94,6 +95,7 @@ export default function Layout() {
     { icon: MdPeople, label: 'Клиенты', path: '/customers' },
     { icon: MdBarChart, label: 'Аналитика', path: '/analytics' },
     { icon: MdBuild, label: 'Конструктор сайта', path: '/site-builder' },
+    { icon: EditIcon, label: 'Редактор страниц', path: '/pages-editor' },
     { icon: MdLocalShipping, label: 'Поставщики', path: '/suppliers' },
     { icon: MdAssessment, label: 'Отчетность', path: '/reports' },
     { icon: SettingsIcon, label: 'Настройки сайта', path: '/site-settings' },

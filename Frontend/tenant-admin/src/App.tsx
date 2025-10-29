@@ -8,6 +8,7 @@ import Orders from './pages/Orders'
 import Customers from './pages/Customers'
 import Analytics from './pages/Analytics'
 import SiteBuilder from './pages/SiteBuilder'
+import PagesEditor from './pages/PagesEditor'
 import Support from './pages/Support'
 import Settings from './pages/Settings'
 import Suppliers from './pages/Suppliers'
@@ -43,6 +44,8 @@ export default function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="site-builder" element={<SiteBuilder />} />
           <Route path="site-builder/:siteId" element={<SiteBuilder />} />
+          <Route path="pages-editor" element={<PagesEditor />} />
+          <Route path="pages-editor/:siteId" element={<PagesEditor />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="reports" element={<Reports />} />
           <Route path="site-settings" element={<SiteSettings />} />

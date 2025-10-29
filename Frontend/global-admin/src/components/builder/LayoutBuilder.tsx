@@ -81,6 +81,13 @@ export default function LayoutBuilder({ section, onChange }: LayoutBuilderProps)
               />
             </Form.Item>
 
+            <Form.Item label="Показать логотип">
+              <Switch
+                checked={config.showLogo !== false}
+                onChange={(checked) => onChange({ showLogo: checked })}
+              />
+            </Form.Item>
+
             <Form.Item label="Цвет фона">
               <ColorPicker
                 value={config.backgroundColor || '#ffffff'}
@@ -100,6 +107,115 @@ export default function LayoutBuilder({ section, onChange }: LayoutBuilderProps)
                 style={{ width: '100%' }}
               />
             </Form.Item>
+
+            <Form.Item label="Высота хедера (px)">
+              <InputNumber
+                value={config.height || 64}
+                onChange={(value) => onChange({ height: value })}
+                min={48}
+                max={120}
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+
+            <Divider>Меню навигации</Divider>
+
+            {(config.menu || []).map((item: any, index: number) => (
+              <Card 
+                key={item.id || index} 
+                size="small" 
+                style={{ marginBottom: 8 }}
+                extra={
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={() => {
+                      const newMenu = [...(config.menu || [])];
+                      newMenu.splice(index, 1);
+                      onChange({ menu: newMenu });
+                    }}
+                  />
+                }
+              >
+                <Form.Item label={`Название #${index + 1}`} style={{ marginBottom: 8 }}>
+                  <Input
+                    value={item.label}
+                    onChange={(e) => {
+                      const newMenu = [...(config.menu || [])];
+                      newMenu[index] = { ...newMenu[index], label: e.target.value };
+                      onChange({ menu: newMenu });
+                    }}
+                    placeholder="Каталог"
+                  />
+                </Form.Item>
+                <Form.Item label="URL" style={{ marginBottom: 8 }}>
+                  <Input
+                    value={item.url}
+                    onChange={(e) => {
+                      const newMenu = [...(config.menu || [])];
+                      newMenu[index] = { ...newMenu[index], url: e.target.value };
+                      onChange({ menu: newMenu });
+                    }}
+                    placeholder="/catalog"
+                  />
+                </Form.Item>
+                <Form.Item label="Иконка" style={{ marginBottom: 8 }}>
+                  <Select
+                    value={item.icon || 'none'}
+                    onChange={(value) => {
+                      const newMenu = [...(config.menu || [])];
+                      newMenu[index] = { ...newMenu[index], icon: value };
+                      onChange({ menu: newMenu });
+                    }}
+                    style={{ width: '100%' }}
+                  >
+                    <Select.Option value="none">🚫 Без иконки</Select.Option>
+                    <Select.Option value="home">🏠 Дом</Select.Option>
+                    <Select.Option value="catalog">📦 Каталог</Select.Option>
+                    <Select.Option value="cart">🛒 Корзина</Select.Option>
+                    <Select.Option value="user">👤 Профиль</Select.Option>
+                    <Select.Option value="heart">❤️ Избранное</Select.Option>
+                    <Select.Option value="info">ℹ️ Информация</Select.Option>
+                    <Select.Option value="phone">📞 Контакты</Select.Option>
+                    <Select.Option value="mail">✉️ Сообщения</Select.Option>
+                    <Select.Option value="star">⭐ Избранное</Select.Option>
+                    <Select.Option value="tag">🏷️ Акции</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item label="Порядок" style={{ marginBottom: 0 }}>
+                  <InputNumber
+                    value={item.order}
+                    onChange={(value) => {
+                      const newMenu = [...(config.menu || [])];
+                      newMenu[index] = { ...newMenu[index], order: value || 0 };
+                      onChange({ menu: newMenu });
+                    }}
+                    min={0}
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Card>
+            ))}
+
+            <Button
+              type="dashed"
+              block
+              icon={<PlusOutlined />}
+              onClick={() => {
+                const newMenu = [...(config.menu || [])];
+                newMenu.push({
+                  id: `menu-${Date.now()}`,
+                  label: 'Новый пункт',
+                  url: '/',
+                  order: newMenu.length,
+                });
+                onChange({ menu: newMenu });
+              }}
+            >
+              Добавить пункт меню
+            </Button>
           </>
         );
 
@@ -152,6 +268,37 @@ export default function LayoutBuilder({ section, onChange }: LayoutBuilderProps)
                 value={config.buttonLink}
                 onChange={(e) => onChange({ buttonLink: e.target.value })}
                 placeholder="/catalog"
+              />
+            </Form.Item>
+
+            <Form.Item label="Текст второй кнопки">
+              <Input
+                value={config.secondaryButtonText}
+                onChange={(e) => onChange({ secondaryButtonText: e.target.value })}
+                placeholder="Узнать больше (необязательно)"
+              />
+            </Form.Item>
+
+            <Form.Item label="Ссылка второй кнопки">
+              <Input
+                value={config.secondaryButtonLink}
+                onChange={(e) => onChange({ secondaryButtonLink: e.target.value })}
+                placeholder="/about"
+              />
+            </Form.Item>
+
+            <Form.Item label="Значок (badge)">
+              <Input
+                value={config.badge}
+                onChange={(e) => onChange({ badge: e.target.value })}
+                placeholder="✨ НОВАЯ КОЛЛЕКЦИЯ"
+              />
+            </Form.Item>
+
+            <Form.Item label="Показать статистику">
+              <Switch
+                checked={config.showStats}
+                onChange={(checked) => onChange({ showStats: checked })}
               />
             </Form.Item>
 
